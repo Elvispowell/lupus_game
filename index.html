@@ -475,10 +475,10 @@ const PROVIDERS = [
       { id: 'openai/gpt-4.1',                                   label: 'GPT-4.1' },
       { id: 'openai/gpt-4.1-mini',                              label: 'GPT-4.1 Mini' },
       { id: 'openai/gpt-4.1-nano',                              label: 'GPT-4.1 Nano' },
-      { id: 'openai/gpt-5',                                     label: 'GPT-5 🔥' },
+      { id: 'openai/gpt-5',                                     label: 'GPT-5' },
       { id: 'openai/gpt-5-mini',                                label: 'GPT-5 Mini' },
       { id: 'openai/gpt-5-nano',                                label: 'GPT-5 Nano' },
-      { id: 'xai/grok-3',                                       label: 'Grok 3 🔥' },
+      { id: 'xai/grok-3',                                       label: 'Grok 3' },
       { id: 'xai/grok-3-mini',                                  label: 'Grok 3 Mini' },
       { id: 'meta/llama-3.3-70b-instruct',                      label: 'LLaMA 3.3 70B' },
       { id: 'meta/llama-4-maverick-17b-128e-instruct-fp8',      label: 'LLaMA 4 Maverick' },
@@ -500,8 +500,13 @@ const PROVIDERS = [
       { id: 'cohere/cohere-command-r-plus-08-2024',             label: 'Command R+' },
     ],
     call: async (key, model, sys, usr) => {
-      const r = await fetch('https://models.inference.ai.azure.com/chat/completions', {
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+      const r = await fetch('https://models.github.ai/inference/chat/completions', {
+        method:'POST', headers:{
+          'Content-Type':'application/json',
+          'Authorization':`Bearer ${key}`,
+          'Accept':'application/vnd.github+json',
+          'X-GitHub-Api-Version':'2026-03-10'
+        },
         body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
           messages:[{role:'system',content:sys},{role:'user',content:usr}] })
       });
@@ -1754,5 +1759,3 @@ buildSetupPanel();
 </script>
 </body>
 </html>
-
-
