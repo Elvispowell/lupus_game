@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Lupus in Fabula</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f6f3; --surface: #ffffff; --surface2: #f0ede6;
+    --border: rgba(0,0,0,0.08); --border-strong: rgba(0,0,0,0.15);
+    --text: #1a1916; --text-muted: #6b6860; --text-faint: #a09e99;
+    --wolf-color: #7c2d12; --wolf-bg: #fef2ec;
+    --village-color: #14532d; --village-bg: #f0fdf4;
+    --dead-color: #6b6860; --dead-bg: #f5f5f4;
+    --narrator-color: #713f12; --narrator-bg: #fefce8; --narrator-border: #fde68a;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* HEADER */
+  header { border-bottom: 1px solid var(--border); padding: 0.8rem 1.75rem; display: flex; align-items: center; gap: 0.75rem; background: var(--surface); }
+  header h1 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; letter-spacing: -0.02em; }
+  .sub { font-size: 0.68rem; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+  #phase-indicator { margin-left: auto; font-size: 0.65rem; font-family: 'DM Mono', monospace; color: var(--text-muted); padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 99px; transition: all 0.3s; }
+  #phase-indicator.night { background: #1e1b4b; color: #c7d2fe; border-color: #4338ca; }
+  #phase-indicator.day { background: var(--narrator-bg); color: var(--narrator-color); border-color: var(--narrator-border); }
+
+  /* NIGHT FLASH OVERLAY */
+  #night-flash { position: fixed; inset: 0; background: #0a0814; z-index: 200; opacity: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; transition: opacity 0.5s; }
+  #night-flash.show { opacity: 1; pointer-events: all; animation: nightPulse 2.2s forwards; }
+  @keyframes nightPulse { 0%{opacity:0} 20%{opacity:1} 75%{opacity:1} 100%{opacity:0} }
+  #night-flash-text { font-family: 'DM Serif Display', serif; font-size: 2.5rem; color: #c7d2fe; letter-spacing: 0.05em; opacity: 0; animation: none; }
+  #night-flash.show #night-flash-text { animation: textFade 2.2s forwards; }
+  @keyframes textFade { 0%{opacity:0;transform:scale(0.95)} 30%{opacity:1;transform:scale(1)} 80%{opacity:1} 100%{opacity:0} }
+
+  #day-flash { position: fixed; inset: 0; background: #fefce8; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  #day-flash.show { animation: dayPulse 1s forwards; }
+  @keyframes dayPulse { 0%{opacity:0} 20%{opacity:0.7} 100%{opacity:0} }
+
+  /* SETUP PANEL */
+  #setup-panel { background: var(--surface); border-bottom: 1px solid var(--border); }
+  #setup-toggle { width: 100%; display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 1.75rem; background: none; border: none; border-bottom: 1px solid transparent; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; color: var(--text-muted); text-align: left; }
+  #setup-toggle:hover { background: var(--surface2); }
+  #setup-toggle .arrow { margin-left: auto; transition: transform 0.2s; font-size: 0.6rem; }
+  #setup-toggle.open .arrow { transform: rotate(180deg); }
+  #setup-toggle.open { border-bottom-color: var(--border); }
+  #setup-body { padding: 0.9rem 1.75rem 1.1rem; display: none; }
+  #setup-body.open { display: block; }
+  .providers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 0.65rem; margin-bottom: 0.9rem; }
+  .provider-card { border: 1px solid var(--border); border-radius: 8px; padding: 0.65rem 0.85rem; background: var(--bg); display: flex; flex-direction: column; gap: 0.35rem; }
+  .provider-header { display: flex; align-items: center; gap: 0.45rem; }
+  .provider-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .provider-name { font-size: 0.75rem; font-weight: 500; }
+  .provider-limit { font-size: 0.6rem; color: var(--text-faint); font-family: 'DM Mono', monospace; margin-left: auto; }
+  .provider-key-row { display: flex; gap: 0.35rem; align-items: center; }
+  .provider-key-input { flex: 1; font-family: 'DM Mono', monospace; font-size: 0.66rem; padding: 0.26rem 0.5rem; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--text); outline: none; min-width: 0; }
+  .provider-key-input:focus { border-color: var(--text); }
+  .provider-status { font-size: 0.58rem; font-family: 'DM Mono', monospace; padding: 0.13rem 0.38rem; border-radius: 99px; white-space: nowrap; }
+  .ps-ok { background: var(--village-bg); color: var(--village-color); }
+  .ps-err { background: var(--wolf-bg); color: var(--wolf-color); }
+  .ps-empty { background: var(--surface2); color: var(--text-faint); }
+  .provider-models { font-size: 0.58rem; color: var(--text-faint); font-family: 'DM Mono', monospace; }
+  .assign-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 0.45rem; }
+  #assign-grid { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+  .assign-chip { display: flex; align-items: center; gap: 0.3rem; border: 1px solid var(--border); border-radius: 7px; padding: 0.28rem 0.5rem; background: var(--surface); font-size: 0.68rem; }
+  .assign-chip .chip-emoji { font-size: 0.82rem; }
+  .assign-chip .chip-label { font-size: 0.68rem; font-weight: 500; white-space: nowrap; }
+  .assign-chip select { font-family: 'DM Mono', monospace; font-size: 0.6rem; border: none; background: transparent; cursor: pointer; color: var(--text-muted); outline: none; max-width: 190px; }
+  .assign-chip.disabled { opacity: 0.4; }
+
+  /* LAYOUT */
+  main { display: grid; grid-template-columns: 250px 1fr 265px; flex: 1; min-height: 0; overflow: hidden; }
+
+  /* PLAYERS PANEL */
+  #players-panel { border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; display: flex; flex-direction: column; }
+  #players-panel h2 { font-size: 0.6rem; letter-spacing: 0.08em; color: var(--text-muted); padding: 0.7rem 1.1rem 0.3rem; text-transform: uppercase; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .player-card { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.1rem; border-bottom: 1px solid var(--border); cursor: default; transition: background 0.1s; }
+  .player-card:hover { background: var(--surface2); }
+  .player-card.dead { opacity: 0.35; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; border: 1px solid var(--border); }
+  .player-info { flex: 1; min-width: 0; }
+  .player-name { font-size: 0.73rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .player-meta { font-size: 0.56rem; font-family: 'DM Mono', monospace; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .player-role-label { font-size: 0.58rem; font-family: 'DM Mono', monospace; color: var(--text-muted); }
+  .player-status { font-size: 0.55rem; padding: 0.09rem 0.35rem; border-radius: 99px; font-family: 'DM Mono', monospace; white-space: nowrap; flex-shrink: 0; }
+  .status-alive { background: var(--village-bg); color: var(--village-color); }
+  .status-dead { background: var(--dead-bg); color: var(--dead-color); }
+  .status-wolf { background: var(--wolf-bg); color: var(--wolf-color); }
+
+  /* CHAT */
+  #chat-area { display: flex; flex-direction: column; overflow: hidden; }
+  #chat-log { flex: 1; overflow-y: auto; padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .msg { display: flex; gap: 0.5rem; max-width: 640px; animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+  .msg-avatar { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; flex-shrink: 0; margin-top: 3px; border: 1px solid var(--border); }
+  .msg-body { flex: 1; }
+  .msg-header { display: flex; align-items: baseline; gap: 0.32rem; margin-bottom: 0.1rem; flex-wrap: wrap; }
+  .msg-name { font-size: 0.72rem; font-weight: 500; }
+  .msg-badge { font-size: 0.53rem; font-family: 'DM Mono', monospace; color: var(--text-faint); border: 1px solid var(--border); padding: 0.03rem 0.28rem; border-radius: 99px; }
+  .msg-time { font-size: 0.54rem; color: var(--text-faint); font-family: 'DM Mono', monospace; }
+  .msg-tag { font-size: 0.52rem; padding: 0.05rem 0.28rem; border-radius: 99px; font-family: 'DM Mono', monospace; }
+  .tag-night { background: #1e1b4b; color: #c7d2fe; }
+  .tag-day { background: #fefce8; color: #854d0e; border: 1px solid #fde68a; }
+  .tag-vote { background: #fef2f2; color: #991b1b; }
+  .tag-system { background: var(--surface2); color: var(--text-muted); }
+  .tag-narrator { background: var(--narrator-bg); color: var(--narrator-color); border: 1px solid var(--narrator-border); }
+  .msg-text { font-size: 0.81rem; line-height: 1.6; color: var(--text); }
+  .msg.secret .msg-text { background: #1e1b4b; color: #1e1b4b; border-radius: 4px; cursor: pointer; user-select: none; transition: all 0.3s; padding: 0.2rem 0.4rem; }
+  .msg.secret .msg-text:hover { background: #312e81; color: #312e81; }
+  .msg.secret .msg-text.revealed { background: #eef2ff; color: var(--text); cursor: pointer; }
+  .msg.secret .secret-hint { font-size: 0.58rem; color: #6366f1; font-family: 'DM Mono', monospace; margin-top: 0.15rem; }
+  .msg.narrator-msg .msg-text { color: var(--narrator-color); }
+  .msg.narrator-msg { background: var(--narrator-bg); border-left: 2px solid var(--narrator-border); border-radius: 0 6px 6px 0; padding: 0.4rem 0.5rem; margin-left: -0.5rem; }
+  .phase-sep { display: flex; align-items: center; gap: 0.65rem; margin: 0.55rem 0; color: var(--text-faint); font-size: 0.58rem; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; text-transform: uppercase; }
+  .phase-sep::before, .phase-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* NARRATOR BAR */
+  #narrator-bar {
+    border-top: 1px solid var(--narrator-border);
+    background: var(--narrator-bg);
+    padding: 0.55rem 1.5rem;
+    display: flex; flex-direction: column; gap: 0.4rem;
+    transition: background 0.3s;
+  }
+  #narrator-bar.flash { background: #fef08a; }
+  .narrator-top { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .narrator-label { font-size: 0.65rem; font-weight: 500; color: var(--narrator-color); font-family: 'DM Mono', monospace; white-space: nowrap; }
+  #narrator-target { font-family: 'DM Mono', monospace; font-size: 0.65rem; padding: 0.25rem 0.45rem; border: 1px solid var(--narrator-border); border-radius: 5px; background: var(--surface); color: var(--narrator-color); cursor: pointer; outline: none; }
+  #pause-btn { font-family: 'DM Sans', sans-serif; font-size: 0.65rem; padding: 0.25rem 0.7rem; border: 1px solid var(--narrator-border); border-radius: 5px; background: var(--surface); color: var(--narrator-color); cursor: pointer; margin-left: auto; transition: background 0.15s; white-space: nowrap; }
+  #pause-btn:hover { background: #fde68a; }
+  #pause-btn.paused { background: var(--narrator-color); color: #fff; border-color: var(--narrator-color); }
+  .narrator-input-row { display: flex; gap: 0.4rem; }
+  #narrator-input { flex: 1; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; padding: 0.38rem 0.65rem; border: 1px solid var(--narrator-border); border-radius: 6px; background: var(--surface); color: var(--text); outline: none; }
+  #narrator-input:focus { border-color: var(--narrator-color); }
+  #narrator-send { font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500; padding: 0.38rem 0.9rem; background: var(--narrator-color); color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+  #narrator-send:hover { opacity: 0.85; }
+  #narrator-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .suggestions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .suggestion-btn { font-size: 0.62rem; font-family: 'DM Mono', monospace; padding: 0.18rem 0.5rem; border: 1px solid var(--narrator-border); border-radius: 99px; background: var(--surface); color: var(--narrator-color); cursor: pointer; transition: background 0.1s; white-space: nowrap; }
+  .suggestion-btn:hover { background: #fde68a; }
+  .suggestion-btn.suggestion-role { background: #1e1b4b; color: #c7d2fe; border-color: #4338ca; font-weight: 500; }
+  .suggestion-btn.suggestion-role:hover { background: #312e81; }
+
+  /* CONTROLS */
+  #controls { border-top: 1px solid var(--border); padding: 0.6rem 1.5rem; background: var(--surface); display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+  #start-btn { font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; padding: 0.42rem 1rem; background: var(--text); color: #fff; border: none; border-radius: 7px; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+  #start-btn:hover { opacity: 0.82; }
+  #start-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  select.ctrl { font-family: 'DM Mono', monospace; font-size: 0.65rem; padding: 0.28rem 0.45rem; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); cursor: pointer; color: var(--text); }
+  .ctrl-label { font-size: 0.65rem; color: var(--text-muted); }
+  #status-text { font-size: 0.64rem; color: var(--text-muted); font-family: 'DM Mono', monospace; flex: 1; text-align: right; }
+
+  /* RIGHT PANEL */
+  #events-panel { border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow: hidden; }
+  #events-panel h2 { font-size: 0.6rem; letter-spacing: 0.08em; color: var(--text-muted); padding: 0.7rem 1.1rem 0.3rem; text-transform: uppercase; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  #events-log { flex: 1; overflow-y: auto; padding: 0.5rem 0.85rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .event-item { font-size: 0.65rem; line-height: 1.5; padding: 0.3rem 0.5rem; border-radius: 4px; border-left: 2px solid var(--border); background: var(--bg); color: var(--text-muted); font-family: 'DM Mono', monospace; animation: fadeIn 0.2s; }
+  .event-item.ev-kill { border-left-color: var(--wolf-color); color: var(--wolf-color); background: var(--wolf-bg); }
+  .event-item.ev-vote { border-left-color: #92400e; color: #92400e; background: #fffbeb; }
+  .event-item.ev-win { border-left-color: #166534; color: #166534; background: #f0fdf4; font-weight: 500; }
+  .event-item.ev-night { border-left-color: #4338ca; color: #4338ca; background: #eef2ff; }
+  .event-item.ev-narrator { border-left-color: var(--narrator-color); color: var(--narrator-color); background: var(--narrator-bg); }
+  #score-section { border-top: 1px solid var(--border); padding: 0.5rem 1.1rem; flex-shrink: 0; }
+  #score-section h3 { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 0.3rem; }
+  .score-row { display: flex; justify-content: space-between; font-size: 0.65rem; padding: 0.1rem 0; font-family: 'DM Mono', monospace; color: var(--text-muted); }
+  .score-num { font-weight: 500; color: var(--text); }
+
+  /* Thinking */
+  .thinking { display: flex; gap: 3px; align-items: center; padding: 0.3rem 0; }
+  .thinking span { width: 3px; height: 3px; background: var(--text-faint); border-radius: 50%; animation: bounce 1.2s infinite; }
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-4px)} }
+
+  /* WIN OVERLAY */
+  #win-overlay { display: none; position: fixed; inset: 0; background: rgba(247,246,243,0.96); z-index: 300; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; text-align: center; backdrop-filter: blur(6px); }
+  #win-overlay.show { display: flex; animation: fadeIn 0.5s; }
+  #win-title { font-family: 'DM Serif Display', serif; font-size: 2.4rem; letter-spacing: -0.03em; line-height: 1.1; }
+  #win-subtitle { font-size: 0.88rem; color: var(--text-muted); max-width: 400px; line-height: 1.6; }
+  #win-roles { font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--text-muted); max-width: 460px; background: var(--surface2); padding: 0.6rem 0.9rem; border-radius: 8px; text-align: left; line-height: 1.9; white-space: pre-line; }
+  #win-again { font-family: 'DM Sans', sans-serif; font-size: 0.78rem; padding: 0.5rem 1.5rem; background: var(--text); color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.15s; }
+  #win-again:hover { opacity: 0.8; }
+
+  @media (max-width: 900px) { main { grid-template-columns: 200px 1fr; } #events-panel { display: none; } }
+  @media (max-width: 580px) { main { grid-template-columns: 1fr; } #players-panel { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="night-flash"><div id="night-flash-text">🌙 Notte</div></div>
+<div id="day-flash"></div>
+
+<header>
+  <h1>AI Lupus in Fabula</h1>
+  <span class="sub">narratore umano · multi-provider</span>
+  <div id="phase-indicator">in attesa</div>
+</header>
+
+<div id="setup-panel">
+  <button id="setup-toggle" onclick="toggleSetup(this)">
+    ⚙️ Configurazione API Keys &amp; Giocatori
+    <span class="arrow">▼</span>
+  </button>
+  <div id="setup-body">
+    <div class="providers-grid" id="providers-grid"></div>
+    <div class="assign-title">Assegna provider + modello ad ogni giocatore</div>
+    <div id="assign-grid"></div>
+    <div class="assign-title" style="margin-top:0.9rem">Configura i ruoli</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center">
+      <div class="assign-chip">
+        <span>🐺</span>
+        <span style="font-size:0.7rem;font-weight:500">Lupi:</span>
+        <select id="num-wolves" class="ctrl" style="border:none;background:transparent;font-size:0.7rem">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+      <div class="assign-chip">
+        <span>🔮</span>
+        <span style="font-size:0.7rem;font-weight:500">Veggenti:</span>
+        <select id="num-seers" class="ctrl" style="border:none;background:transparent;font-size:0.7rem">
+          <option value="0">0</option>
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+      <div class="assign-chip">
+        <span>💚</span>
+        <span style="font-size:0.7rem;font-weight:500">Guaritori:</span>
+        <select id="num-healers" class="ctrl" style="border:none;background:transparent;font-size:0.7rem">
+          <option value="0">0</option>
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+      <span style="font-size:0.62rem;color:var(--text-faint);font-family:var(--font-mono,monospace)">il resto sarà villager</span>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div id="players-panel">
+    <h2>Giocatori</h2>
+    <div id="players-list"></div>
+  </div>
+
+  <div id="chat-area">
+    <div id="chat-log"></div>
+
+    <!-- NARRATOR BAR -->
+    <div id="narrator-bar">
+      <div class="narrator-top">
+        <span class="narrator-label">📜 Narratore</span>
+        <select id="narrator-target"><option value="all">→ Tutti</option></select>
+        <button id="pause-btn" onclick="togglePause()">⏸ Pausa</button>
+        <button id="advance-btn" style="display:none;font-family:'DM Sans',sans-serif;font-size:0.65rem;padding:0.25rem 0.9rem;border:1px solid #166534;border-radius:5px;background:#f0fdf4;color:#166534;cursor:pointer;font-weight:500;white-space:nowrap;">☀️ Avanza</button>
+      </div>
+      <div class="suggestions" id="suggestions-row"></div>
+      <div class="narrator-input-row">
+        <input type="text" id="narrator-input" placeholder="Scrivi un messaggio ai giocatori..." onkeydown="if(event.key==='Enter')sendNarratorMsg()" />
+        <button id="narrator-send" onclick="sendNarratorMsg()" disabled>Invia</button>
+      </div>
+    </div>
+
+    <div id="controls">
+      <button id="start-btn" onclick="startGame()" disabled>Aggiungi almeno una key</button>
+      <span class="ctrl-label">Velocità:</span>
+      <select id="speed-select" class="ctrl">
+        <option value="2000">Veloce</option>
+        <option value="4000" selected>Normale</option>
+        <option value="7000">Lenta</option>
+      </select>
+      <span class="ctrl-label">Giocatori:</span>
+      <select id="num-players-select" class="ctrl" onchange="rebuildAssignGrid()">
+        <option value="4">4 AI</option>
+        <option value="5">5 AI</option>
+        <option value="6">6 AI</option>
+        <option value="7" selected>7 AI</option>
+        <option value="8">8 AI</option>
+        <option value="9">9 AI</option>
+        <option value="10">10 AI</option>
+        <option value="11">11 AI</option>
+        <option value="12">12 AI</option>
+      </select>
+      <span id="status-text">Configura le API key nel pannello sopra</span>
+    </div>
+  </div>
+
+  <div id="events-panel">
+    <h2>Registro eventi</h2>
+    <div id="events-log"></div>
+    <div id="score-section">
+      <h3>Statistiche</h3>
+      <div class="score-row"><span>Notte</span><span class="score-num" id="stat-night">—</span></div>
+      <div class="score-row"><span>Villager vivi</span><span class="score-num" id="stat-village">—</span></div>
+      <div class="score-row"><span>Lupi vivi</span><span class="score-num" id="stat-wolves">—</span></div>
+      <div class="score-row"><span>Morti totali</span><span class="score-num" id="stat-dead">0</span></div>
+    </div>
+  </div>
+</main>
+
+<div id="win-overlay">
+  <div id="win-title"></div>
+  <div id="win-subtitle"></div>
+  <div id="win-roles"></div>
+  <button id="win-again" onclick="resetGame()">Nuova Partita</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// PROVIDERS
+// ═══════════════════════════════════════════════════════
+const PROVIDERS = [
+  {
+    id: 'groq', name: 'Groq', color: '#f97316',
+    placeholder: 'gsk_...', validate: k => k.startsWith('gsk_') && k.length > 20,
+    limit: '500k token/g',
+    models: [
+      { id: 'llama-3.3-70b-versatile',        label: 'LLaMA 3.3 70B' },
+      { id: 'llama-3.1-8b-instant',           label: 'LLaMA 3.1 8B' },
+      { id: 'moonshotai/kimi-k2-instruct',    label: 'Kimi K2' },
+      { id: 'qwen/qwen3-32b',                 label: 'Qwen3 32B' },
+      { id: 'openai/gpt-oss-120b',            label: 'GPT-OSS 120B' },
+      { id: 'openai/gpt-oss-20b',             label: 'GPT-OSS 20B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'cerebras', name: 'Cerebras', color: '#8b5cf6',
+    placeholder: 'csk-...', validate: k => k.startsWith('csk-') && k.length > 20,
+    limit: '1M token/g',
+    models: [
+      { id: 'llama3.1-8b',                       label: 'LLaMA 3.1 8B' },
+      { id: 'gpt-oss-120b',                       label: 'GPT-OSS 120B' },
+      { id: 'zai-glm-4.7',                        label: 'GLM 4.7 (355B)' },
+      { id: 'qwen-3-235b-a22b-instruct-2507',     label: 'Qwen3 235B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'google', name: 'Google AI Studio', color: '#10b981',
+    placeholder: 'AIza...', validate: k => k.startsWith('AIza') && k.length > 20,
+    limit: '300k token/g',
+    models: [
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+      { id: 'gemini-2.5-flash',                    label: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro',                      label: 'Gemini 2.5 Pro' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          system_instruction:{parts:[{text:sys}]},
+          contents:[{role:'user',parts:[{text:usr}]}],
+          generationConfig:{
+            maxOutputTokens:180, temperature:0.88,
+            thinkingConfig:{ thinkingBudget:0 }
+          }
+        })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.candidates?.[0]?.content?.parts?.map(p=>p.text).join('');
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'sambanova', name: 'SambaNova', color: '#ef4444',
+    placeholder: 'sn-...', validate: k => k.length > 15,
+    limit: '~15 partite/g',
+    models: [
+      { id: 'Meta-Llama-3.3-70B-Instruct',         label: 'LLaMA 3.3 70B' },
+      { id: 'Meta-Llama-3.1-8B-Instruct',          label: 'LLaMA 3.1 8B' },
+      { id: 'DeepSeek-R1-0528',                    label: 'DeepSeek R1' },
+      { id: 'DeepSeek-V3-0324',                    label: 'DeepSeek V3' },
+      { id: 'DeepSeek-V3.1',                       label: 'DeepSeek V3.1' },
+      { id: 'DeepSeek-R1-Distill-Llama-70B',       label: 'DeepSeek R1 Distill 70B' },
+      { id: 'gpt-oss-120b',                        label: 'GPT-OSS 120B' },
+      { id: 'Qwen3-235B-A22B-Instruct-2507',       label: 'Qwen3 235B' },
+      { id: 'Qwen3-32B',                           label: 'Qwen3 32B' },
+      { id: 'Llama-4-Maverick-17B-128E-Instruct',  label: 'LLaMA 4 Maverick' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const cleanKey = key.trim().replace(/[^\x20-\x7E]/g, '');
+      const r = await fetch('https://api.sambanova.ai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${cleanKey}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const text = d?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Risposta vuota dal modello');
+      return text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'minimax', name: 'MiniMax', color: '#2563eb',
+    placeholder: 'inserisci la tua key MiniMax...', validate: k => k.length > 15,
+    limit: 'crediti iniziali gratuiti',
+    models: [
+      { id: 'MiniMax-M2.5',           label: 'MiniMax M2.5' },
+      { id: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 Fast' },
+      { id: 'MiniMax-M2.1',           label: 'MiniMax M2.1' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.minimax.io/v1/text/chatcompletion_v2', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.base_resp?.status_msg||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'ai21', name: 'AI21 Labs', color: '#6366f1',
+    placeholder: 'key AI21...', validate: k => k.length > 15,
+    limit: '$10 crediti iniziali',
+    models: [
+      { id: 'jamba-large-1.7',  label: 'Jamba Large 1.7' },
+      { id: 'jamba-mini-1.7',   label: 'Jamba Mini 1.7' },
+      { id: 'jamba-large',      label: 'Jamba Large' },
+      { id: 'jamba-mini',       label: 'Jamba Mini' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.ai21.com/studio/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.detail||e?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'github', name: 'GitHub Models', color: '#1a1916',
+    placeholder: 'ghp_... o github_pat_...', validate: k => (k.startsWith('ghp_')||k.startsWith('github_pat_')) && k.length > 20,
+    limit: '50 req/g grandi',
+    models: [
+      { id: 'gpt-4o',                             label: 'GPT-4o' },
+      { id: 'gpt-4o-mini',                        label: 'GPT-4o Mini' },
+      { id: 'Phi-4',                              label: 'Phi-4' },
+      { id: 'Mistral-small',                      label: 'Mistral Small' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'mistral', name: 'Mistral AI', color: '#ff7000',
+    placeholder: '...', validate: k => k.length > 15,
+    limit: '1B token/mese',
+    models: [
+      { id: 'mistral-small-latest',   label: 'Mistral Small' },
+      { id: 'mistral-medium-latest',  label: 'Mistral Medium' },
+      { id: 'mistral-large-latest',   label: 'Mistral Large' },
+      { id: 'open-mistral-nemo',      label: 'Mistral Nemo' },
+      { id: 'codestral-latest',       label: 'Codestral' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'cohere', name: 'Cohere', color: '#39594d',
+    placeholder: '...', validate: k => k.length > 15,
+    limit: '1.000 req/mese',
+    models: [
+      { id: 'command-a-03-2025',       label: 'Command A' },
+      { id: 'command-r-plus-08-2024',  label: 'Command R+' },
+      { id: 'command-r-08-2024',       label: 'Command R' },
+      { id: 'command-r7b-12-2024',     label: 'Command R7B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.cohere.com/v2/chat', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.message?.content?.[0]?.text;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'nvidia', name: 'NVIDIA NIM', color: '#76b900',
+    placeholder: '(key sul server — lascia vuoto)', validate: k => true,
+    limit: '40 req/min', serverSide: true,
+    models: [
+      { id: 'meta/llama-3.3-70b-instruct',                label: 'LLaMA 3.3 70B' },
+      { id: 'meta/llama-3.1-405b-instruct',               label: 'LLaMA 3.1 405B' },
+      { id: 'moonshotai/kimi-k2-instruct-0905',           label: 'Kimi K2.5' },
+      { id: 'moonshotai/kimi-k2-instruct',                label: 'Kimi K2' },
+      { id: 'openai/gpt-oss-120b',                        label: 'GPT-OSS 120B' },
+      { id: 'openai/gpt-oss-20b',                         label: 'GPT-OSS 20B' },
+      { id: 'z-ai/glm5',                                  label: 'GLM-5' },
+      { id: 'z-ai/glm4.7',                                label: 'GLM-4.7' },
+      { id: 'deepseek-ai/deepseek-v3.1',                  label: 'DeepSeek V3.1' },
+      { id: 'deepseek-ai/deepseek-v3.2',                  label: 'DeepSeek V3.2' },
+      { id: 'deepseek-ai/deepseek-r1-distill-qwen-32b',   label: 'DeepSeek R1 Distill 32B' },
+      { id: 'nvidia/llama-3.3-nemotron-super-49b-v1',     label: 'Nemotron Super 49B' },
+      { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',    label: 'Nemotron Ultra 253B' },
+      { id: 'nvidia/llama-3.1-nemotron-nano-8b-v1',       label: 'Nemotron Nano 8B' },
+      { id: 'minimaxai/minimax-m2.5',                     label: 'MiniMax M2.5' },
+      { id: 'mistralai/mixtral-8x22b-instruct',           label: 'Mixtral 8x22B' },
+      { id: 'mistralai/mistral-small-24b-instruct',       label: 'Mistral Small 24B' },
+      { id: 'mistralai/magistral-small-2506',             label: 'Magistral Small' },
+      { id: 'qwen/qwen3-5-122b-a10b',                     label: 'Qwen 3.5 122B' },
+      { id: 'qwen/qwq-32b',                               label: 'QwQ 32B' },
+      { id: 'igenius/colosseum_355b_instruct_16k',        label: 'Colosseum 355B' },
+      { id: 'tiiuae/falcon3-7b-instruct',                 label: 'Falcon 3 7B' },
+      { id: 'aisingapore/sea-lion-7b-instruct',           label: 'SEA-Lion 7B' },
+      { id: 'rakuten/rakutenai-7b-instruct',              label: 'RakutenAI 7B' },
+      { id: 'mediatek/breeze-7b-instruct',                label: 'Breeze 7B' },
+      { id: 'upstage/solar-10.7b-instruct',               label: 'Solar 10.7B' },
+      { id: 'baichuan-inc/baichuan2-13b-chat',            label: 'Baichuan2 13B' },
+      { id: 'microsoft/phi-4-mini-instruct',              label: 'Phi-4 Mini' },
+      { id: 'ibm/granite-3_3-8b-instruct',               label: 'Granite 3.3 8B' },
+      { id: 'bytedance/seed-oss-36b-instruct',            label: 'Seed OSS 36B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('/api/nvidia', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error||e?.detail||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'cloudflare', name: 'Cloudflare Workers AI', color: '#f59e0b',
+    placeholder: '(key sul server — lascia vuoto)', validate: k => true,
+    limit: '10k neuroni/g', serverSide: true,
+    models: [
+      { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',      label: 'LLaMA 3.3 70B' },
+      { id: '@cf/nvidia/llama-3.1-nemotron-70b-instruct',    label: 'Nemotron 70B' },
+      { id: '@cf/meta/llama-3.1-8b-instruct',                label: 'LLaMA 3.1 8B' },
+      { id: '@cf/google/gemma-3-12b-it',                     label: 'Gemma 3 12B' },
+      { id: '@cf/mistral/mistral-7b-instruct-v0.2',          label: 'Mistral 7B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('/api/cloudflare', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ model, max_tokens:180,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+];
+
+// ═══════════════════════════════════════════════════════
+// PLAYER SLOTS
+// ═══════════════════════════════════════════════════════
+const PLAYER_SLOTS = [
+  { emoji:'🟢', personality:'analitico, preciso, ragionamento logico freddo, cita probabilità',           defaultProvider:'github',    defaultModel:'gpt-4o' },
+  { emoji:'🔵', personality:'creativo, costruisce consenso, usa analogie, tende a mediare',               defaultProvider:'google',    defaultModel:'gemini-2.5-flash-lite' },
+  { emoji:'🟣', personality:'riflessivo, cauto, attento alle contraddizioni, etico',                      defaultProvider:'groq',      defaultModel:'llama-3.3-70b-versatile' },
+  { emoji:'⚫', personality:'diretto, sarcastico, provocatorio, sfida le opinioni altrui',                defaultProvider:'groq',      defaultModel:'moonshotai/kimi-k2-instruct' },
+  { emoji:'🔴', personality:'conciso, pragmatico, europeo, diffidente dei colossi tech',                  defaultProvider:'groq',      defaultModel:'qwen/qwen3-32b' },
+  { emoji:'🟤', personality:'open source, populista, difende trasparenza, sospettoso delle AI chiuse',    defaultProvider:'sambanova', defaultModel:'Meta-Llama-3.3-70B-Instruct' },
+  { emoji:'🟡', personality:'professionale, integrato, cerca mediazione, evita conflitti diretti',        defaultProvider:'groq',      defaultModel:'llama-3.3-70b-versatile' },
+  { emoji:'🩵', personality:'ragionamento profondo, cerca prove concrete prima di concludere',             defaultProvider:'cerebras',  defaultModel:'llama3.1-8b' },
+  { emoji:'🟠', personality:'sintetico, orientato ai risultati, pragmatico e diretto',                    defaultProvider:'groq',      defaultModel:'llama-3.1-8b-instant' },
+  { emoji:'🩶', personality:'metodico, ragionamento strutturato, equilibrato tra creatività e logica',    defaultProvider:'groq',      defaultModel:'llama-3.1-8b-instant' },
+  { emoji:'🟥', personality:'impulsivo, emotivo, reagisce di pancia, si fida dell\'istinto',              defaultProvider:'mistral',   defaultModel:'mistral-small-latest' },
+  { emoji:'🟦', personality:'diplomatico, cerca sempre il compromesso, evita scontri diretti',            defaultProvider:'sambanova', defaultModel:'DeepSeek-R1-0528' },
+];
+
+const BG_COLORS = ['#f0fdf4','#eff6ff','#faf5ff','#fff7ed','#fef2f2','#f0fdfa','#fefce8','#fdf4ff','#fdf2fb','#f0f9ff'];
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let game = null;
+let isRunning = false;
+let isPaused = false;
+let pauseResolve = null;
+const keys = {};
+
+// ═══════════════════════════════════════════════════════
+// SETUP UI
+// ═══════════════════════════════════════════════════════
+function toggleSetup(btn) {
+  btn.classList.toggle('open');
+  document.getElementById('setup-body').classList.toggle('open');
+}
+
+function buildSetupPanel() {
+  const grid = document.getElementById('providers-grid');
+  grid.innerHTML = '';
+  PROVIDERS.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'provider-card';
+    const keyRow = p.serverSide
+      ? `<div class="provider-key-row">
+           <span style="font-size:0.65rem;color:var(--village-color);background:var(--village-bg);padding:0.2rem 0.55rem;border-radius:99px;font-family:var(--font-mono,monospace)">🔒 key sul server</span>
+           <span class="provider-status ps-ok" id="status-${p.id}">attivo</span>
+         </div>`
+      : `<div class="provider-key-row">
+           <input class="provider-key-input" type="password" placeholder="${p.placeholder}"
+             id="key-${p.id}" oninput="onKeyChange('${p.id}')" autocomplete="off"/>
+           <span class="provider-status ps-empty" id="status-${p.id}">vuota</span>
+         </div>`;
+    card.innerHTML = `
+      <div class="provider-header">
+        <div class="provider-dot" style="background:${p.color}"></div>
+        <span class="provider-name">${p.name}</span>
+        <span class="provider-limit">${p.limit}</span>
+      </div>
+      ${keyRow}
+      <div class="provider-models">${p.models.map(m=>m.label).join(' · ')}</div>`;
+    grid.appendChild(card);
+  });
+  rebuildAssignGrid();
+}
+
+function onKeyChange(pid) {
+  const p = PROVIDERS.find(x => x.id === pid);
+  if (p.serverSide) return; // key gestita dal server
+  const val = document.getElementById(`key-${pid}`).value.trim().replace(/[^\x20-\x7E]/g, '');
+  const statusEl = document.getElementById(`status-${pid}`);
+  if (!val) { keys[pid]=''; statusEl.textContent='vuota'; statusEl.className='provider-status ps-empty'; }
+  else if (p.validate(val)) { keys[pid]=val; statusEl.textContent='valida'; statusEl.className='provider-status ps-ok'; }
+  else { keys[pid]=''; statusEl.textContent='non valida'; statusEl.className='provider-status ps-err'; }
+  rebuildAssignGrid();
+  checkCanStart();
+}
+
+function checkCanStart() {
+  const hasKey = Object.values(keys).some(k=>k.length>0);
+  const hasServerSide = PROVIDERS.some(p=>p.serverSide);
+  const has = hasKey || hasServerSide;
+  const btn = document.getElementById('start-btn');
+  btn.disabled = !has;
+  btn.textContent = has ? 'Inizia Partita' : 'Aggiungi almeno una key';
+  setStatus(has ? 'Premi "Inizia Partita" per cominciare' : 'Configura le API key nel pannello sopra');
+}
+
+function getAvailableOptions() {
+  const opts = [];
+  PROVIDERS.forEach(p => {
+    if (p.serverSide || keys[p.id]) p.models.forEach(m => opts.push({ label:`${p.name} · ${m.label}`, providerId:p.id, modelId:m.id }));
+  });
+  return opts;
+}
+
+function updateChipName(i) {
+  const sel = document.getElementById(`assign-${i}`);
+  const lbl = document.getElementById(`chip-label-${i}`);
+  if (!sel || !lbl) return;
+  const opts = getAvailableOptions();
+  const opt = opts[parseInt(sel.value)];
+  lbl.textContent = opt ? opt.label.split(' · ')[1] : '—';
+}
+
+function rebuildAssignGrid() {
+  const n = parseInt(document.getElementById('num-players-select').value);
+  const grid = document.getElementById('assign-grid');
+  grid.innerHTML = '';
+  const opts = getAvailableOptions();
+  PLAYER_SLOTS.slice(0, n).forEach((slot, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'assign-chip' + (opts.length ? '' : ' disabled');
+    const optsHTML = opts.length
+      ? opts.map((o,oi)=>`<option value="${oi}">${o.label}</option>`).join('')
+      : '<option value="">— nessuna key —</option>';
+    chip.innerHTML = `
+      <span class="chip-emoji">${slot.emoji}</span>
+      <span class="chip-label" id="chip-label-${i}">—</span>
+      <select id="assign-${i}" onchange="updateChipName(${i})">${optsHTML}</select>`;
+    grid.appendChild(chip);
+    if (opts.length) {
+      const sel = document.getElementById(`assign-${i}`);
+      const pi = opts.findIndex(o=>o.providerId===slot.defaultProvider&&o.modelId===slot.defaultModel);
+      const fi = opts.findIndex(o=>o.providerId===slot.defaultProvider);
+      sel.selectedIndex = pi>=0 ? pi : (fi>=0 ? fi : i%opts.length);
+      updateChipName(i);
+    }
+  });
+}
+
+function getAssignment(i) {
+  const sel = document.getElementById(`assign-${i}`);
+  if (!sel) return null;
+  const opts = getAvailableOptions();
+  return opts[parseInt(sel.value)] || opts[0] || null;
+}
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function getDelay() { return parseInt(document.getElementById('speed-select').value); }
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+function timeStr() { return new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}); }
+function setStatus(t) { document.getElementById('status-text').textContent = t; }
+function setPhase(t, cls='') {
+  const el = document.getElementById('phase-indicator');
+  el.textContent = t;
+  el.className = cls;
+}
+
+function addEvent(text, type='') {
+  const el = document.createElement('div');
+  el.className = 'event-item' + (type ? ' ev-'+type : '');
+  el.textContent = text;
+  const log = document.getElementById('events-log');
+  log.appendChild(el);
+  el.scrollIntoView({behavior:'smooth'});
+}
+
+function addSep(text) {
+  const el = document.createElement('div');
+  el.className = 'phase-sep';
+  el.textContent = text;
+  document.getElementById('chat-log').appendChild(el);
+  el.scrollIntoView({behavior:'smooth'});
+}
+
+function addMsg(player, text, tag='', secret=false) {
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg' + (secret ? ' secret' : '');
+  const tagHTML = tag ? `<span class="msg-tag tag-${tag}">${tag}</span>` : '';
+  const secretBadge = secret ? `<span class="msg-badge" style="background:#eef2ff;color:#6366f1;border-color:#c7d2fe">🔒 segreto</span>` : '';
+  const hintHTML = secret ? `<div class="secret-hint">clicca per rivelare</div>` : '';
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background:${player.bg||'#f0ede6'}">${player.emoji}</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name">${player.name}</span>
+        <span class="msg-badge">${player.providerLabel}</span>
+        ${secretBadge}
+        <span class="msg-time">${timeStr()}</span>
+        ${tagHTML}
+      </div>
+      <div class="msg-text" ${secret ? `onclick="this.classList.toggle('revealed')"` : ''}>${text}</div>
+      ${hintHTML}
+    </div>`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+function addSystemMsg(text) {
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg system';
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background:#f0ede6;font-size:0.62rem">📜</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name" style="color:var(--text-muted)">Sistema</span>
+        <span class="msg-time">${timeStr()}</span>
+        <span class="msg-tag tag-system">sistema</span>
+      </div>
+      <div class="msg-text">${text}</div>
+    </div>`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+function showThinking(player) {
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg'; wrap.id = 'thinking-indicator';
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background:${player.bg||'#f0ede6'}">${player.emoji}</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name" style="color:var(--text-muted)">${player.name}</span>
+        <span class="msg-time" style="color:var(--text-faint)">sta scrivendo...</span>
+      </div>
+      <div class="thinking"><span></span><span></span><span></span></div>
+    </div>`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+function removeThinking() { const el=document.getElementById('thinking-indicator'); if(el) el.remove(); }
+
+function updatePlayersList() {
+  const list = document.getElementById('players-list');
+  list.innerHTML = '';
+  if (!game) return;
+  const roleMap = {wolf:'🐺 lupo',seer:'🔮 veggente',healer:'💚 guaritore',villager:'👤 villager'};
+  for (const p of game.players) {
+    const card = document.createElement('div');
+    card.className = 'player-card' + (p.dead ? ' dead' : '');
+    const showRole = p.dead || game.gameOver;
+    const roleLabel = showRole ? (roleMap[p.role]||p.role) : '— ruolo segreto';
+    const stClass = p.dead ? 'status-dead' : (game.gameOver&&p.role==='wolf' ? 'status-wolf' : 'status-alive');
+    const stText = p.dead ? 'eliminato' : (game.gameOver&&p.role==='wolf' ? 'lupo!' : 'in vita');
+    card.innerHTML = `
+      <div class="avatar" style="background:${p.bg||'#f0ede6'}">${p.emoji}</div>
+      <div class="player-info">
+        <div class="player-name">${p.name}</div>
+        <div class="player-meta">${p.providerLabel}</div>
+        <div class="player-role-label">${roleLabel}</div>
+      </div>
+      <span class="player-status ${stClass}">${stText}</span>`;
+    list.appendChild(card);
+  }
+}
+
+function updateStats() {
+  if (!game) return;
+  const alive = game.players.filter(p=>!p.dead);
+  document.getElementById('stat-night').textContent = game.night;
+  document.getElementById('stat-wolves').textContent = alive.filter(p=>p.role==='wolf').length;
+  document.getElementById('stat-village').textContent = alive.filter(p=>p.role!=='wolf').length;
+  document.getElementById('stat-dead').textContent = game.players.filter(p=>p.dead).length;
+}
+
+function updateNarratorTargets() {
+  const sel = document.getElementById('narrator-target');
+  if (!sel || !game) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="all">→ Tutti</option>';
+  game.players.filter(p=>!p.dead).forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.name; o.textContent = `→ ${p.name}`;
+    sel.appendChild(o);
+  });
+  if (prev) sel.value = prev;
+}
+
+// ═══════════════════════════════════════════════════════
+// NARRATOR SUGGESTIONS
+// ═══════════════════════════════════════════════════════
+function updateSuggestions() {
+  if (!game) return;
+  const row = document.getElementById('suggestions-row');
+  row.innerHTML = '';
+  const alive = game.players.filter(p=>!p.dead);
+  const wolves = alive.filter(p=>p.role==='wolf');
+  const seer = alive.find(p=>p.role==='seer');
+  const healer = alive.find(p=>p.role==='healer');
+  const names = alive.map(p=>p.name).join(', ');
+
+  if (game.phase === 'night') {
+    if (wolves.length) {
+      const btn = document.createElement('button');
+      btn.className = 'suggestion-btn suggestion-role';
+      btn.innerHTML = `🐺 Chiedi ai Lupi chi eliminare`;
+      btn.onclick = () => askRoleDirectly(
+        wolves.map(p=>p.name),
+        `🐺 Lupi (${wolves.map(p=>p.name).join(', ')}), chi volete eliminare stanotte? Ricordate di scegliere il bersaglio più pericoloso. Scegliete tra: ${names}`
+      );
+      row.appendChild(btn);
+    }
+    if (seer) {
+      const knownWolves = (seer.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
+      const seerHint = knownWolves.length ? ` (conosci già i lupi: ${knownWolves.join(', ')})` : '';
+      const btn = document.createElement('button');
+      btn.className = 'suggestion-btn suggestion-role';
+      btn.innerHTML = `🔮 Chiedi al Veggente chi investigare${seerHint}`;
+      btn.onclick = () => askRoleDirectly(
+        [seer.name],
+        `🔮 ${seer.name}, chi vuoi investigare stanotte? Scegli tra: ${names}`
+      );
+      row.appendChild(btn);
+    }
+    if (healer) {
+      const btn = document.createElement('button');
+      btn.className = 'suggestion-btn suggestion-role';
+      btn.innerHTML = `💚 Chiedi al Guaritore chi proteggere`;
+      btn.onclick = () => askRoleDirectly(
+        [healer.name],
+        `💚 ${healer.name}, chi vuoi proteggere stanotte? Puoi proteggere anche te stesso. Scegli tra: ${names}`
+      );
+      row.appendChild(btn);
+    }
+    if (!wolves.length && !seer && !healer) {
+      addSystemMsg('Tutti i ruoli speciali sono stati eliminati — nessuna azione notturna possibile.');
+    }
+  } else if (game.phase === 'day') {
+    [`Chi sospettate tra: ${names}?`, 'Difendete la vostra innocenza!', `Chi volete eliminare?`].forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'suggestion-btn';
+      btn.textContent = s;
+      btn.onclick = () => { document.getElementById('narrator-input').value = s; };
+      row.appendChild(btn);
+    });
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'suggestion-btn';
+    btn.textContent = 'Benvenuti! Presentatevi al villaggio.';
+    btn.onclick = () => { document.getElementById('narrator-input').value = 'Benvenuti! Presentatevi al villaggio.'; };
+    row.appendChild(btn);
+  }
+}
+
+async function askRoleDirectly(targetNames, message) {
+  if (!game) return;
+  const log = document.getElementById('chat-log');
+
+  playSound('narrator');
+  flashNarratorBar();
+  const wrap = document.createElement('div');
+  wrap.className = 'msg narrator-msg';
+  const targetLabel = targetNames.length === 1 ? `a ${targetNames[0]}` : `ai Lupi (${targetNames.join(', ')})`;
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background:#fef9c3;border-color:#fde68a;font-size:0.65rem">📜</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name">Narratore</span>
+        <span class="msg-badge">${targetLabel}</span>
+        <span class="msg-time">${timeStr()}</span>
+        <span class="msg-tag tag-narrator">narratore</span>
+      </div>
+      <div class="msg-text">${message}</div>
+    </div>`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+  addEvent(`Narratore → ${targetLabel}`, 'narrator');
+
+  document.getElementById('narrator-send').disabled = true;
+  const targets = game.players.filter(p => !p.dead && targetNames.includes(p.name));
+  for (const p of targets) {
+    showThinking(p);
+    setStatus(`${p.name} risponde al narratore...`);
+    const reply = await ask(p, `Il narratore ti dice in segreto: "${message}". Rispondi in modo coinvolgente e in personaggio, indicando chiaramente la tua scelta.`);
+    removeThinking();
+    // Salva la risposta notturna nel giocatore per usarla nella scelta finale
+    p.nightStatement = (p.nightStatement || '') + ' ' + reply;
+    addMsg(p, reply, 'night', true);
+    await sleep(500);
+  }
+  document.getElementById('narrator-send').disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════
+// PAUSE / RESUME
+// ═══════════════════════════════════════════════════════
+async function waitIfPaused() {
+  if (!isPaused) return;
+  await new Promise(resolve => { pauseResolve = resolve; });
+}
+
+function togglePause() {
+  const btn = document.getElementById('pause-btn');
+  if (!isRunning) return;
+  isPaused = !isPaused;
+  if (isPaused) {
+    btn.textContent = '▶ Riprendi';
+    btn.classList.add('paused');
+    addSystemMsg('⏸ Partita in pausa — il narratore ha il controllo.');
+    setStatus('In pausa');
+    playSound('pause');
+  } else {
+    btn.textContent = '⏸ Pausa';
+    btn.classList.remove('paused');
+    addSystemMsg('▶ Partita ripresa.');
+    setStatus('Partita in corso...');
+    if (pauseResolve) { pauseResolve(); pauseResolve = null; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// NARRATOR MESSAGE
+// ═══════════════════════════════════════════════════════
+async function sendNarratorMsg() {
+  const input = document.getElementById('narrator-input');
+  const targetSel = document.getElementById('narrator-target');
+  const text = input.value.trim();
+  if (!text || !game) return;
+
+  playSound('narrator');
+  flashNarratorBar();
+
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg narrator-msg';
+  const targetLabel = targetSel.value==='all' ? 'a tutti' : `a ${targetSel.value}`;
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background:#fef9c3;border-color:#fde68a;font-size:0.65rem">📜</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name">Narratore</span>
+        <span class="msg-badge">${targetLabel}</span>
+        <span class="msg-time">${timeStr()}</span>
+        <span class="msg-tag tag-narrator">narratore</span>
+      </div>
+      <div class="msg-text">${text}</div>
+    </div>`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+  input.value = '';
+  addEvent(`Narratore → ${targetLabel}`, 'narrator');
+
+  document.getElementById('narrator-send').disabled = true;
+  const targets = targetSel.value==='all'
+    ? game.players.filter(p=>!p.dead)
+    : game.players.filter(p=>p.name===targetSel.value&&!p.dead);
+
+  for (const p of targets) {
+    showThinking(p);
+    setStatus(`${p.name} risponde al narratore...`);
+    const reply = await ask(p, `Il narratore ti dice: "${text}". Rispondi direttamente e in modo coinvolgente.`);
+    removeThinking();
+    addMsg(p, reply, 'day');
+    await sleep(300);
+  }
+  document.getElementById('narrator-send').disabled = false;
+}
+
+function flashNarratorBar() {
+  const bar = document.getElementById('narrator-bar');
+  bar.classList.add('flash');
+  setTimeout(() => bar.classList.remove('flash'), 400);
+}
+
+// ═══════════════════════════════════════════════════════
+// API CALL
+// ═══════════════════════════════════════════════════════
+async function callProvider(player, sys, usr) {
+  const provider = PROVIDERS.find(p=>p.id===player.providerId);
+  if (!provider) throw new Error('Provider non trovato');
+  const rawKey = provider.serverSide ? '' : keys[player.providerId];
+  if (!provider.serverSide && !rawKey) throw new Error('Provider non configurato');
+  const key = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').trim() : '';
+  await sleep(2500);
+  return await provider.call(key, player.modelId, sys, usr);
+}
+
+function buildSysPrompt(player) {
+  const alive = game.players.filter(p=>!p.dead).map(p=>p.name).join(', ');
+  const isWolf = player.role==='wolf';
+  const allies = isWolf
+    ? game.players.filter(p=>p.role==='wolf'&&!p.dead&&p.name!==player.name).map(p=>p.name)
+    : [];
+
+  let roleInfo = '';
+  if (isWolf) {
+    const allyCtx = allies.length
+      ? `Sei in squadra con: ${allies.join(', ')}. Durante il giorno dovete coordinarvi senza rivelare la vostra identità — difendetevi a vicenda, create sospetti su altri, e cercate di far votare i giocatori più pericolosi (veggente, guaritore).`
+      : `Sei l'unico lupo rimasto. Devi sembrare innocente e manipolare il voto.`;
+    roleInfo = `Sei un LUPO MANNARO. Obiettivo: eliminare tutti i villager. ${allyCtx} Di giorno sembri innocente.`;
+  } else if (player.role==='seer') {
+    const knownWolves = (player.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
+    const knownInnocent = (player.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
+    const strategyCtx = knownWolves.length
+      ? `Sai che questi sono LUPI: ${knownWolves.join(', ')}. Devi decidere strategicamente: rivelare subito questa info rischia di farti eliminare dai lupi, ma tenerla nascosta potrebbe far vincere i lupi. Valuta se chiedere protezione al guaritore prima di rivelare.`
+      : `Non hai ancora scoperto lupi. Cerca di investigare i sospettati più credibili.`;
+    const innocentCtx = knownInnocent.length ? ` Hai verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
+    roleInfo = `Sei il VEGGENTE. ${strategyCtx}${innocentCtx}`;
+  } else if (player.role==='healer') {
+    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno dalla morte (anche te stesso). Di giorno cerca i lupi e proteggi i giocatori più preziosi.`;
+  } else {
+    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni e cerca di smascherare i lupi.`;
+  }
+
+  return `Sei il modello AI "${player.name}". Personalità: ${player.personality}.
+Ruolo segreto: ${roleInfo}
+Giocatori vivi: ${alive}
+Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}
+Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente.`;
+}
+
+function buildHistoryCtx(player) {
+  if (!game.dayHistory || game.dayHistory.length === 0) return '';
+  // Prende max ultimi 3 giorni per contenere i token
+  const recent = game.dayHistory.slice(-3);
+  const lines = recent.map(day => {
+    const myStatements = day.statements.filter(s => s.name === player.name);
+    const others = day.statements.filter(s => s.name !== player.name);
+    const myCtx = myStatements.length ? `\nTu hai detto: ${myStatements.map(s=>`"${s.text}"`).join('; ')}` : '';
+    const othersCtx = others.length ? `\nGli altri hanno detto: ${others.map(s=>`${s.name}: "${s.text}"`).join(' | ')}` : '';
+    return `--- Giorno ${day.dayNum} ---${myCtx}${othersCtx}\nBandito: ${day.eliminated||'nessuno'} (${day.eliminatedRole||''})`;
+  }).join('\n');
+  return `\n\nSTORIA DEI GIORNI PRECEDENTI (ricordatela per essere coerente):\n${lines}`;
+}
+
+async function ask(player, prompt, candidates=null) {
+  try {
+    await waitIfPaused();
+    const reply = await callProvider(player, buildSysPrompt(player), prompt);
+    if (candidates) {
+      const found = candidates.find(p=>reply.includes(p.name));
+      return found ? found.name : candidates[Math.floor(Math.random()*candidates.length)].name;
+    }
+    return reply;
+  } catch(e) {
+    setStatus(`Errore (${player.name}): ${e.message}`);
+    if (candidates) return candidates[Math.floor(Math.random()*candidates.length)].name;
+    return `[${player.name} non risponde — ${e.message}]`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// GAME LOGIC
+// ═══════════════════════════════════════════════════════
+function checkWin() {
+  const alive = game.players.filter(p=>!p.dead);
+  const wolves = alive.filter(p=>p.role==='wolf');
+  const village = alive.filter(p=>p.role!=='wolf');
+  if (wolves.length===0) return 'village';
+  if (wolves.length>=village.length) return 'wolves';
+  return null;
+}
+
+function rebuildRolesGrid() {
+  const n = parseInt(document.getElementById('num-players-select').value);
+  const grid = document.getElementById('roles-grid');
+  grid.innerHTML = '';
+  PLAYER_SLOTS.slice(0, n).forEach((slot, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'assign-chip';
+    chip.innerHTML = `
+      <span class="chip-emoji">${slot.emoji}</span>
+      <select id="role-${i}" style="font-family:'DM Mono',monospace;font-size:0.62rem;border:none;background:transparent;cursor:pointer;color:var(--text-muted);outline:none;">
+        <option value="villager">👤 villager</option>
+        <option value="wolf">🐺 lupo</option>
+        <option value="seer">🔮 veggente</option>
+        <option value="healer">💚 guaritore</option>
+      </select>`;
+    grid.appendChild(chip);
+  });
+  // Default sensato: primo lupo, secondo veggente, terzo guaritore, resto villager
+  const defaultRoles = ['wolf','seer','healer'];
+  for (let i=0; i<n; i++) {
+    const sel = document.getElementById(`role-${i}`);
+    if (sel) sel.value = defaultRoles[i] || 'villager';
+  }
+}
+
+function getManualRoles(n) {
+  const roles = [];
+  for (let i=0; i<n; i++) {
+    const sel = document.getElementById(`role-${i}`);
+    roles.push(sel ? sel.value : 'villager');
+  }
+  return roles;
+}
+
+function assignRoles(players) {
+  const numWolves  = parseInt(document.getElementById('num-wolves')?.value  || '1');
+  const numSeers   = parseInt(document.getElementById('num-seers')?.value   || '1');
+  const numHealers = parseInt(document.getElementById('num-healers')?.value || '1');
+  const n = players.length;
+
+  // Costruisci array ruoli
+  const roles = [];
+  for (let i=0; i<Math.min(numWolves, n); i++) roles.push('wolf');
+  for (let i=0; i<Math.min(numSeers, n - roles.length); i++) roles.push('seer');
+  for (let i=0; i<Math.min(numHealers, n - roles.length); i++) roles.push('healer');
+  while (roles.length < n) roles.push('villager');
+
+  // Assegna in ordine casuale
+  const shuffled = [...players].sort(()=>Math.random()-0.5);
+  const rolesCopy = [...roles].sort(()=>Math.random()-0.5);
+  shuffled.forEach((p, i) => { p.role = rolesCopy[i] || 'villager'; });
+}
+
+async function waitForAdvance(label) {
+  return new Promise(resolve => {
+    const btn = document.getElementById('advance-btn');
+    btn.textContent = label;
+    btn.style.display = 'inline-block';
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Lampeggia per attirare attenzione
+    btn.style.animation = 'pulse 1s infinite';
+    btn.onclick = () => {
+      btn.style.display = 'none';
+      btn.style.animation = '';
+      btn.onclick = null;
+      resolve();
+    };
+  });
+}
+
+async function runNight() {
+  game.night++;
+  game.phase = 'night';
+  setPhase(`Notte ${game.night}`, 'night');
+  showNightFlash();
+  await sleep(1200);
+  addSep(`— NOTTE ${game.night} —`);
+  addEvent(`Notte ${game.night}`, 'night');
+
+  // Reset risposte notturne precedenti
+  game.players.forEach(p => p.nightStatement = '');
+
+  const alive = game.players.filter(p=>!p.dead);
+  const wolves = alive.filter(p=>p.role==='wolf');
+  const seer = alive.find(p=>p.role==='seer');
+  const healer = alive.find(p=>p.role==='healer');
+  const nonWolves = alive.filter(p=>p.role!=='wolf');
+  const names = alive.map(p=>p.name).join(', ');
+
+  // Costruisce messaggio suggerimenti adattato ai ruoli vivi
+  const rolesAlive = [];
+  if (healer) rolesAlive.push(`💚 Guaritore (${healer.name})`);
+  if (seer) rolesAlive.push(`🔮 Veggente (${seer.name})`);
+  if (wolves.length) rolesAlive.push(`🐺 Lupi (${wolves.map(p=>p.name).join(', ')})`);
+
+  updateSuggestions();
+  updateNarratorTargets();
+  playSound('night');
+
+  addSystemMsg(`🌙 Notte ${game.night} — Ruoli attivi: ${rolesAlive.join(', ')}. Interrogali nell'ordine suggerito poi premi "Avanza verso l'alba".`);
+  setStatus('In attesa del narratore...');
+  await waitForAdvance('☀️ Avanza verso l\'alba');
+  await waitIfPaused();
+
+  let protected_name = null;
+  let killed_name = null;
+
+  // ── 1. GUARITORE (solo se vivo) ───────────────────────
+  if (healer) {
+    setStatus(`${healer.name} (💚 guaritore) sceglie chi proteggere...`);
+    const prevStatement = healer.nightStatement?.trim();
+    const coherenceCtx = prevStatement
+      ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.`
+      : '';
+    const prompt = `Sei il GUARITORE. Devi scegliere chi proteggere stanotte. Puoi scegliere anche te stesso. ${coherenceCtx} Scegli tra: ${names}. Rispondi SOLO con il nome esatto.`;
+    protected_name = await ask(healer, prompt, alive);
+    addNarratorSecret(`💚 Guaritore (${healer.name}) protegge: <strong>${protected_name}</strong>`);
+    await sleep(getDelay()*0.4);
+  }
+
+  // ── 2. VEGGENTE (solo se vivo) ────────────────────────
+  if (seer) {
+    const targets = alive.filter(p=>p.name!==seer.name);
+    setStatus(`${seer.name} (🔮 veggente) sceglie chi investigare...`);
+    const prevStatement = seer.nightStatement?.trim();
+    const coherenceCtx = prevStatement
+      ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.`
+      : '';
+    // Il veggente conosce i lupi già scoperti — li include nel contesto
+    const knownWolves = (seer.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
+    const knownInnocent = (seer.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
+    const seerKnowledge = knownWolves.length
+      ? `Sai già che questi sono LUPI: ${knownWolves.join(', ')}. Considera se rivelare questa info al villaggio o tenerla segreta per non farti eliminare.`
+      : knownInnocent.length ? `Hai già verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
+    const prompt = `Sei il VEGGENTE. ${seerKnowledge} ${coherenceCtx} Scegli chi investigare tra: ${targets.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+    const choice = await ask(seer, prompt, targets);
+    const target = game.players.find(p=>p.name===choice);
+    if (target) {
+      if (!seer.seenPlayers) seer.seenPlayers=[];
+      // Evita duplicati
+      if (!seer.seenPlayers.find(s=>s.name===target.name)) {
+        seer.seenPlayers.push({name:target.name, isWolf:target.role==='wolf'});
+      }
+      const roleLabel = target.role==='wolf' ? '🐺 LUPO' : `👤 ${target.role==='seer'?'Veggente':target.role==='healer'?'Guaritore':'Villager'}`;
+      addNarratorSecret(`🔮 Veggente (${seer.name}) investiga: <strong>${target.name}</strong> → ruolo: <strong>${roleLabel}</strong>`);
+    }
+    await sleep(getDelay()*0.4);
+  }
+
+  // ── 3. LUPI (solo se vivi) ────────────────────────────
+  if (wolves.length>0 && nonWolves.length>0) {
+    setStatus(`Lupi (${wolves.map(p=>p.name).join(', ')}) scelgono la vittima...`);
+    const wolfAlliesCtx = wolves.length > 1
+      ? `Siete in squadra con: ${wolves.map(p=>p.name).join(', ')}. Coordinate la scelta per eliminare il bersaglio più pericoloso.`
+      : `Sei l'unico lupo rimasto.`;
+    const prevStatement = wolves.map(p=>p.nightStatement?.trim()).filter(Boolean).join(' / ');
+    const coherenceCtx = prevStatement
+      ? `Il lupo/i lupi hanno detto al narratore: "${prevStatement}". La scelta deve essere coerente.`
+      : '';
+    const prompt = `Sei un LUPO. ${wolfAlliesCtx} ${coherenceCtx} Scegli chi eliminare stanotte tra: ${nonWolves.map(p=>p.name).join(', ')}. Scegli il bersaglio più pericoloso (veggente, guaritore, o chi vi sospetta). Rispondi SOLO con il nome esatto.`;
+    killed_name = await ask(wolves[0], prompt, nonWolves);
+
+    if (killed_name === protected_name) {
+      addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ✅ SALVATO dal Guaritore! Nessuno muore stanotte.`);
+      addEvent(`${killed_name} salvato dal Guaritore`, 'night');
+      playSound('save');
+      killed_name = null;
+    } else {
+      const victim = game.players.find(p=>p.name===killed_name);
+      if (victim) {
+        const protectedInfo = protected_name
+          ? `Il Guaritore proteggeva ${protected_name}, non ${killed_name}.`
+          : 'Nessun Guaritore in campo.';
+        addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ❌ ${protectedInfo} <strong>${killed_name} morirà all'alba.</strong>`);
+        victim.dead = true;
+        game.deathLog.push(`${victim.name} ucciso dai lupi (notte ${game.night})`);
+        addEvent(`${victim.name} eliminato dai lupi`, 'kill');
+        playSound('kill');
+      }
+    }
+  }
+
+  await sleep(getDelay()*0.5);
+  return killed_name;
+}
+
+function addNarratorSecret(html) {
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:0.3rem 0;padding:0.5rem 0.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#713f12;font-family:var(--font-mono,monospace);';
+  wrap.innerHTML = `<span style="opacity:0.6;font-size:0.65rem">📜 solo tu vedi questo · </span>${html}`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+async function runDay(nightVictim) {
+  const alive = game.players.filter(p=>!p.dead);
+  game.phase = 'day';
+  setPhase(`Giorno ${game.night}`, 'day');
+  showDayFlash();
+  playSound('day');
+  await sleep(500);
+  addSep(`— GIORNO ${game.night} —`);
+  updateSuggestions();
+  updateNarratorTargets();
+
+  if (nightVictim) {
+    addSystemMsg(`L'alba porta una notizia tragica: ${nightVictim} non c'è più. Il villaggio si riunisce.`);
+    addEvent(`${nightVictim} trovato eliminato`, 'kill');
+  } else {
+    addSystemMsg(`Nessuno è morto stanotte. I lupi sono ancora tra noi.`);
+  }
+  await sleep(getDelay()*0.5);
+
+  // Storico dei messaggi della discussione — passato a ogni AI
+  const discussionHistory = [];
+
+  // 3 giri completi di discussione
+  for (let round = 1; round <= 3; round++) {
+    addSep(`— DISCUSSIONE — turno ${round}/3`);
+    const aliveCurrent = game.players.filter(p=>!p.dead);
+    const order = aliveCurrent.map(p=>p.name).join(', ');
+
+    for (let i = 0; i < aliveCurrent.length; i++) {
+      const p = aliveCurrent[i];
+      if (!isRunning) return;
+      await waitIfPaused();
+
+      // Contesto ordine solo al primo turno
+      const alreadySpoke = aliveCurrent.slice(0,i).map(p=>p.name);
+      const yetToSpeak = aliveCurrent.slice(i+1).map(p=>p.name);
+      const orderCtx = round===1
+        ? ` ${alreadySpoke.length ? `In questo turno hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio.` : 'Sei l\'ultimo a parlare.'}`
+        : '';
+
+      // Storico discussione passato all'AI
+      const historyCtx = discussionHistory.length > 0
+        ? `\n\nEcco cosa è stato detto finora nella discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}\n\nRispondi direttamente a quello che hanno detto, specialmente se qualcuno ti ha nominato o ha fatto osservazioni su di te.`
+        : '';
+
+      const baseCtx = round===1
+        ? (nightVictim
+            ? `È giorno ${game.night}. Stanotte ${nightVictim} è stato eliminato. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
+            : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
+        : round===2
+        ? `Turno 2 di discussione. Rispondi a quello che hanno detto gli altri, difenditi se necessario, e approfondisci i tuoi sospetti.`
+        : `Turno finale prima del voto. Esprimi il tuo verdetto definitivo su chi vuoi eliminare e perché, rispondendo anche a chi ti ha accusato.`;
+
+      const ctx = `${baseCtx}${orderCtx}${historyCtx}`;
+
+      showThinking(p);
+      setStatus(`${p.name} parla (turno ${round}/3)...`);
+      const reply = await ask(p, ctx);
+      removeThinking();
+      addMsg(p, reply, 'day');
+
+      // Aggiungi al storico per le AI successive
+      discussionHistory.push({name: p.name, text: reply});
+
+      await sleep(getDelay()*1.2);
+    }
+    if (round < 3) await sleep(getDelay()*0.5);
+  }
+
+  // Narratore decide quando passare al voto
+  addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
+  setStatus('In attesa del narratore...');
+  await waitForAdvance('🗳️ Avanza al voto');
+  await waitIfPaused();
+
+  addSep('— VOTAZIONE —');
+  addSystemMsg('Il villaggio vota chi bandire.');
+  updateSuggestions();
+  await sleep(getDelay()*0.5);
+
+  const votes = {};
+  const aliveFinal = game.players.filter(p=>!p.dead);
+  for (const p of aliveFinal) votes[p.name]=0;
+
+  // Passiamo anche lo storico discussione al momento del voto
+  const voteSummary = discussionHistory.length>0
+    ? `\n\nRiassunto della discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
+    : '';
+
+  for (const voter of aliveFinal) {
+    if (!isRunning) return;
+    await waitIfPaused();
+    const candidates = aliveFinal.filter(p=>p.name!==voter.name);
+    showThinking(voter);
+    setStatus(`${voter.name} vota...`);
+    const choice = await ask(voter, `Vota per eliminare uno tra: ${candidates.map(p=>p.name).join(', ')}. Basa il tuo voto sulla discussione.${voteSummary} Rispondi SOLO con il nome esatto.`, candidates);
+    removeThinking();
+    if (votes[choice]!==undefined) votes[choice]++;
+    addMsg(voter, `Voto per eliminare ${choice}.`, 'vote');
+    await sleep(getDelay()*1.0);
+  }
+
+  const maxV = Math.max(...Object.values(votes));
+  const top = Object.entries(votes).filter(([_,v])=>v===maxV).map(([n])=>n);
+  const eliminated = top[Math.floor(Math.random()*top.length)];
+  const target = game.players.find(p=>p.name===eliminated);
+  if (target) {
+    target.dead=true;
+    const rmap={wolf:'🐺 un LUPO',seer:'🔮 il Veggente',healer:'💚 il Guaritore',villager:'👤 un innocente'};
+    game.deathLog.push(`${target.name} bandito (giorno ${game.night})`);
+    addSystemMsg(`Il verdetto: ${eliminated} viene bandito. Era ${rmap[target.role]}!`);
+    addEvent(`${eliminated} bandito (${target.role==='wolf'?'LUPO!':'innocente'})`, 'vote');
+    playSound('kill');
+  }
+
+  // Salva riassunto del giorno nella memoria storica
+  game.dayHistory.push({
+    dayNum: game.night,
+    statements: discussionHistory.map(s => ({ name: s.name, text: s.text.slice(0, 120) })),
+    eliminated: eliminated || null,
+    eliminatedRole: target ? target.role : null,
+  });
+
+  updatePlayersList(); updateStats();
+}
+
+function showWin(winner) {
+  game.gameOver=true; updatePlayersList();
+  playSound('win');
+  const rmap={wolf:'🐺 Lupo',seer:'🔮 Veggente',healer:'💚 Guaritore',villager:'👤 Villager'};
+  document.getElementById('win-roles').textContent = game.players
+    .map(p=>`${p.emoji} ${p.name} [${p.providerLabel}] — ${rmap[p.role]}${p.dead?' (eliminato)':''}`)
+    .join('\n');
+  if (winner==='village') {
+    document.getElementById('win-title').textContent='Il Villaggio Vince!';
+    document.getElementById('win-title').style.color='#14532d';
+    document.getElementById('win-subtitle').textContent=`I lupi smascherati: ${game.players.filter(p=>p.role==='wolf').map(p=>p.name).join(', ')}.`;
+    addEvent('🏆 Vittoria del Villaggio!','win');
+  } else {
+    document.getElementById('win-title').textContent='I Lupi Vincono!';
+    document.getElementById('win-title').style.color='#7c2d12';
+    document.getElementById('win-subtitle').textContent=`I lupi hanno vinto: ${game.players.filter(p=>p.role==='wolf').map(p=>p.name).join(', ')}.`;
+    addEvent('🐺 Vittoria dei Lupi!','win');
+  }
+  document.getElementById('win-overlay').classList.add('show');
+  isRunning=false;
+  const btn=document.getElementById('start-btn');
+  btn.disabled=false; btn.textContent='Nuova Partita';
+}
+
+async function runGame() {
+  while (isRunning) {
+    const victim = await runNight();
+    updatePlayersList(); updateStats();
+    const w1=checkWin(); if(w1){showWin(w1);return;}
+    await sleep(getDelay()*1.5);
+    await runDay(victim);
+    const w2=checkWin(); if(w2){showWin(w2);return;}
+    await sleep(getDelay()*1.5);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// START / RESET
+// ═══════════════════════════════════════════════════════
+function startGame() {
+  const opts = getAvailableOptions();
+  if (!opts.length) return;
+
+  document.getElementById('start-btn').disabled=true;
+  document.getElementById('chat-log').innerHTML='';
+  document.getElementById('events-log').innerHTML='';
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('narrator-send').disabled=false;
+  document.getElementById('setup-toggle').classList.remove('open');
+  document.getElementById('setup-body').classList.remove('open');
+  isPaused=false;
+  document.getElementById('pause-btn').textContent='⏸ Pausa';
+  document.getElementById('pause-btn').classList.remove('paused');
+
+  const n=parseInt(document.getElementById('num-players-select').value);
+  game = {
+    players: PLAYER_SLOTS.slice(0,n).map((slot,i)=>{
+      const a=getAssignment(i)||opts[i%opts.length];
+      const provider=PROVIDERS.find(p=>p.id===a.providerId);
+      const modelObj=provider?.models.find(m=>m.id===a.modelId);
+      const modelLabel=modelObj?.label||a.modelId;
+      const providerName=provider?.name||a.providerId;
+      return {
+        ...slot,
+        name: modelLabel,
+        providerLabel: `${providerName} · ${modelLabel}`,
+        providerId: a.providerId,
+        modelId: a.modelId,
+        bg: BG_COLORS[i%BG_COLORS.length],
+        dead: false, role: null, seenPlayers: [],
+      };
+    }),
+    night:0, phase:'setup', deathLog:[], gameOver:false, dayHistory:[],
+  };
+
+  assignRoles(game.players);
+  updatePlayersList(); updateStats();
+  updateNarratorTargets(); updateSuggestions();
+  isRunning=true;
+  setPhase('partita in corso');
+
+  const lineup=game.players.map(p=>`${p.emoji} ${p.name}`).join(', ');
+  addSystemMsg(`Partita iniziata! Giocatori: ${lineup}. I ruoli sono segreti.`);
+  addEvent('Partita iniziata','');
+
+  runGame().catch(e=>{
+    addSystemMsg(`Errore fatale: ${e.message}`);
+    isRunning=false;
+    document.getElementById('start-btn').disabled=false;
+    document.getElementById('start-btn').textContent='Riprova';
+  });
+}
+
+function resetGame() {
+  isRunning=false; isPaused=false;
+  if (pauseResolve) { pauseResolve(); pauseResolve=null; }
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('chat-log').innerHTML='';
+  document.getElementById('events-log').innerHTML='';
+  document.getElementById('players-list').innerHTML='';
+  ['stat-night','stat-village','stat-wolves'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('stat-dead').textContent='0';
+  document.getElementById('narrator-send').disabled=true;
+  document.getElementById('pause-btn').textContent='⏸ Pausa';
+  document.getElementById('pause-btn').classList.remove('paused');
+  document.getElementById('advance-btn').style.display='none';
+  game=null;
+  setPhase('in attesa','');
+  checkCanStart();
+  rebuildAssignGrid();
+  document.getElementById('suggestions-row').innerHTML='';
+}
+
+// ═══════════════════════════════════════════════════════
+// VISUAL EFFECTS
+// ═══════════════════════════════════════════════════════
+function showNightFlash() {
+  const el=document.getElementById('night-flash');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+function showDayFlash() {
+  const el=document.getElementById('day-flash');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),1000);
+}
+
+// ═══════════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════════
+function playSound(type) {
+  try {
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    const t=ctx.currentTime;
+    if (type==='night') {
+      osc.type='sine';
+      osc.frequency.setValueAtTime(220,t);
+      osc.frequency.exponentialRampToValueAtTime(110,t+1.5);
+      gain.gain.setValueAtTime(0.15,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+1.5);
+      osc.start(); osc.stop(t+1.5);
+    } else if (type==='day') {
+      osc.type='triangle';
+      osc.frequency.setValueAtTime(440,t);
+      osc.frequency.exponentialRampToValueAtTime(660,t+0.4);
+      gain.gain.setValueAtTime(0.1,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+0.5);
+      osc.start(); osc.stop(t+0.5);
+    } else if (type==='narrator') {
+      osc.type='sine';
+      osc.frequency.setValueAtTime(523,t);
+      osc.frequency.setValueAtTime(659,t+0.1);
+      gain.gain.setValueAtTime(0.09,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+0.3);
+      osc.start(); osc.stop(t+0.3);
+    } else if (type==='pause') {
+      osc.type='sine';
+      osc.frequency.setValueAtTime(330,t);
+      osc.frequency.exponentialRampToValueAtTime(220,t+0.4);
+      gain.gain.setValueAtTime(0.09,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+0.4);
+      osc.start(); osc.stop(t+0.4);
+    } else if (type==='kill') {
+      osc.type='sawtooth';
+      osc.frequency.setValueAtTime(180,t);
+      osc.frequency.exponentialRampToValueAtTime(60,t+0.6);
+      gain.gain.setValueAtTime(0.13,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+0.6);
+      osc.start(); osc.stop(t+0.6);
+    } else if (type==='save') {
+      osc.type='triangle';
+      osc.frequency.setValueAtTime(440,t);
+      osc.frequency.exponentialRampToValueAtTime(880,t+0.3);
+      gain.gain.setValueAtTime(0.1,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+0.4);
+      osc.start(); osc.stop(t+0.4);
+    } else if (type==='win') {
+      [523,659,784,1047].forEach((freq,i)=>{
+        const o2=ctx.createOscillator(),g2=ctx.createGain();
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.type='triangle'; o2.frequency.value=freq;
+        g2.gain.setValueAtTime(0.1,t+i*0.12);
+        g2.gain.exponentialRampToValueAtTime(0.001,t+i*0.12+0.4);
+        o2.start(t+i*0.12); o2.stop(t+i*0.12+0.4);
+      });
+    }
+  } catch(e) {}
+}
+
+// Input enable/disable
+document.getElementById('narrator-input').addEventListener('input', function() {
+  document.getElementById('narrator-send').disabled = !this.value.trim() || !game;
+});
+
+// Init
+buildSetupPanel();
+</script>
+</body>
+</html>

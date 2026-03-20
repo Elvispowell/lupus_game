@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/nvidia", "destination": "/api/nvidia" },
+    { "source": "/api/cloudflare", "destination": "/api/cloudflare" }
+  ]
+}
