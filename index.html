@@ -236,6 +236,24 @@
           <option value="2">2</option>
         </select>
       </div>
+      <div class="assign-chip">
+        <span>🔫</span>
+        <span style="font-size:0.7rem;font-weight:500">Sceriffi:</span>
+        <select id="num-sheriffs" class="ctrl" style="border:none;background:transparent;font-size:0.7rem">
+          <option value="0" selected>0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+      <div class="assign-chip">
+        <span>🃏</span>
+        <span style="font-size:0.7rem;font-weight:500">Matti:</span>
+        <select id="num-jesters" class="ctrl" style="border:none;background:transparent;font-size:0.7rem">
+          <option value="0" selected>0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
       <span style="font-size:0.62rem;color:var(--text-faint);font-family:var(--font-mono,monospace)">il resto sarà villager</span>
     </div>
   </div>
@@ -267,6 +285,7 @@
 
     <div id="controls">
       <button id="start-btn" onclick="startGame()" disabled>Aggiungi almeno una key</button>
+      <button id="stop-btn" onclick="stopGame()" style="display:none;font-family:'DM Sans',sans-serif;font-size:0.65rem;padding:0.25rem 0.9rem;border:1px solid #991b1b;border-radius:5px;background:#fef2f2;color:#991b1b;cursor:pointer;font-weight:500">⏹ Ferma Partita</button>
       <span class="ctrl-label">Velocità:</span>
       <select id="speed-select" class="ctrl">
         <option value="2000">Veloce</option>
@@ -654,7 +673,7 @@ const PROVIDERS = [
   },
   {
     id: 'fireworks', name: 'Fireworks AI', color: '#dc2626',
-    placeholder: 'fw-...', validate: k => k.startsWith('fw-') && k.length > 10,
+    placeholder: 'fw-...', validate: k => k.length > 10,
     limit: '10 RPM gratuiti',
     models: [
       { id: 'accounts/fireworks/models/llama-v3p3-70b-instruct',      label: 'LLaMA 3.3 70B' },
@@ -918,7 +937,7 @@ function updatePlayersList() {
   const list = document.getElementById('players-list');
   list.innerHTML = '';
   if (!game) return;
-  const roleMap = {wolf:'🐺 lupo',seer:'🔮 veggente',healer:'💚 guaritore',villager:'👤 villager'};
+  const roleMap = {wolf:'🐺 lupo',seer:'🔮 veggente',healer:'💚 guaritore',sheriff:'🔫 sceriffo',jester:'🃏 matto',villager:'👤 villager'};
   for (const p of game.players) {
     const card = document.createElement('div');
     card.className = 'player-card' + (p.dead ? ' dead' : '');
@@ -971,9 +990,22 @@ function updateSuggestions() {
   const wolves = alive.filter(p=>p.role==='wolf');
   const seer = alive.find(p=>p.role==='seer');
   const healer = alive.find(p=>p.role==='healer');
+  const sheriff = alive.find(p=>p.role==='sheriff'&&!p.hasShot);
   const names = alive.map(p=>p.name).join(', ');
 
   if (game.phase === 'night') {
+    const names = alivePlayers.map(p=>p.name).join(', ');
+
+    if (sheriff) {
+      const btn = document.createElement('button');
+      btn.className = 'suggestion-btn suggestion-role';
+      btn.innerHTML = `🔫 Chiedi allo Sceriffo se vuole sparare`;
+      btn.onclick = () => askRoleDirectly(
+        [sheriff.name],
+        `🔫 ${sheriff.name}, vuoi usare il tuo proiettile stanotte? Se sì, di' "sparo a [nome]". Se no, di' "aspetto". Ricorda: hai UN solo proiettile per tutta la partita. Giocatori vivi: ${names}`
+      );
+      row.appendChild(btn);
+    }
     if (wolves.length) {
       const btn = document.createElement('button');
       btn.className = 'suggestion-btn suggestion-role';
@@ -1161,29 +1193,35 @@ async function callProvider(player, sys, usr) {
 
 function buildSysPrompt(player) {
   const alive = game.players.filter(p=>!p.dead).map(p=>p.name).join(', ');
-  const isWolf = player.role==='wolf';
-  const allies = isWolf
-    ? game.players.filter(p=>p.role==='wolf'&&!p.dead&&p.name!==player.name).map(p=>p.name)
-    : [];
+  const hasMatto = game.players.some(p=>p.role==='jester');
+  const hasSheriff = game.players.some(p=>p.role==='sheriff');
 
+  // Info ruolo
   let roleInfo = '';
-  if (isWolf) {
+  if (player.role==='wolf') {
+    const allies = game.players.filter(p=>p.role==='wolf'&&!p.dead&&p.name!==player.name).map(p=>p.name);
     const allyCtx = allies.length
-      ? `Sei in squadra con: ${allies.join(', ')}. Durante il giorno dovete coordinarvi senza rivelare la vostra identità — difendetevi a vicenda, create sospetti su altri, e cercate di far votare i giocatori più pericolosi (veggente, guaritore).`
-      : `Sei l'unico lupo rimasto. Devi sembrare innocente e manipolare il voto.`;
-    roleInfo = `Sei un LUPO MANNARO. Obiettivo: eliminare tutti i villager. ${allyCtx} Di giorno sembri innocente.`;
+      ? `Sei in squadra con: ${allies.join(', ')}. Coordinate senza rivelare la vostra identità.`
+      : `Sei l'unico lupo rimasto.`;
+    const mattoCtx = hasMatto ? ` C'è un Matto in gioco — se viene votato dal villaggio vince lui, non tu. Considera se usarlo come distrazione o eliminarlo.` : '';
+    roleInfo = `Sei un LUPO MANNARO. Obiettivo: eliminare tutti i non-lupi. ${allyCtx}${mattoCtx} Strategie extra: Weaponized Consensus (crea consenso artificiale su un innocente), Ghost Narrative (costruisci una narrativa fittizia accettata da tutti), Illogical Killer Gambit (usa scelte apparentemente irrazionali come scudo), Difesa dell'alleato (difendilo indirettamente), Poisoned Well (prima di morire framing un innocente come tuo complice), Framing attivo (crea sospetti sistematici su chi ti minaccia). Di giorno sembri un villager qualunque.`;
   } else if (player.role==='seer') {
     const knownWolves = (player.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
     const knownInnocent = (player.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
     const strategyCtx = knownWolves.length
-      ? `Sai che questi sono LUPI: ${knownWolves.join(', ')}. Devi decidere strategicamente: rivelare subito questa info rischia di farti eliminare dai lupi, ma tenerla nascosta potrebbe far vincere i lupi. Valuta se chiedere protezione al guaritore prima di rivelare.`
-      : `Non hai ancora scoperto lupi. Cerca di investigare i sospettati più credibili.`;
-    const innocentCtx = knownInnocent.length ? ` Hai verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
-    roleInfo = `Sei il VEGGENTE. ${strategyCtx}${innocentCtx}`;
+      ? `Sai che questi sono LUPI: ${knownWolves.join(', ')}. Decidi strategicamente quando e come rivelare — farlo troppo presto ti mette in pericolo.`
+      : `Non hai ancora scoperto lupi.`;
+    const innocentCtx = knownInnocent.length ? ` Verificati innocenti: ${knownInnocent.join(', ')}.` : '';
+    roleInfo = `Sei il VEGGENTE. ${strategyCtx}${innocentCtx} Strategie extra: Clutch Reveal (rivela le info nel momento di massimo impatto), Soft Reveal (insinua senza rivelare per guidare il voto), Protezione preventiva (chiedi al guaritore di proteggerti prima di rivelare), Detective Credibility (costruisci credibilità nei giorni precedenti per dare più peso alla tua rivelazione). Agli occhi del villaggio sembri un cittadino normale.`;
   } else if (player.role==='healer') {
-    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno dalla morte (anche te stesso). Di giorno cerca i lupi e proteggi i giocatori più preziosi.`;
+    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno dalla morte. Strategie extra: Threat Assessment (proteggi chi è più sotto accusa quel giorno), Self-preservation (proteggiti quando sei sotto pressione), Veggente Shield (se intuisci chi è il veggente proteggilo sistematicamente). Agli occhi del villaggio sembri un cittadino normale.`;
+  } else if (player.role==='sheriff') {
+    const bulletCtx = player.hasShot ? `Hai già usato il tuo proiettile.` : `Hai ancora il proiettile disponibile. Usalo con saggezza — rivelare il tuo ruolo ti mette in pericolo perché i lupi ti elimineranno prima che tu possa sparare.`;
+    roleInfo = `Sei lo SCERIFFO. ${bulletCtx} Strategie extra: Timing del proiettile (aspetta di avere prove concrete prima di sparare), Sinergia col villaggio (coordina il tuo sparo con il voto — il villaggio vota un sospettato mentre tu spari al lupo confermato), Rivela il ruolo solo se hai prove solide e sei in una posizione sicura. Agli occhi del villaggio sembri un cittadino normale.`;
+  } else if (player.role==='jester') {
+    roleInfo = `Sei il MATTO. Il tuo obiettivo è farti ELIMINARE DAL VOTO del villaggio — questa è l'unica cosa che conta. Se muori ucciso dai lupi o dallo sceriffo NON vinci. Strategie: sembrare sospetto senza esagerare (troppo ovvio e nessuno vota per te), provocare accuse deliberatamente, sfruttare la tensione tra lupi e cittadini, contraddirsi strategicamente, sembrare nervoso o evasivo. Non rivelare MAI che sei il Matto — fingiti un villager in difficoltà.`;
   } else {
-    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni e cerca di smascherare i lupi.`;
+    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni, smascherai i lupi.${hasSheriff?' Nota: c\'è uno Sceriffo in gioco che può sparare di notte — potrebbe essere un alleato prezioso.':''}`;
   }
 
   return `Sei il modello AI "${player.name}". Personalità: ${player.personality}.
@@ -1229,9 +1267,11 @@ async function ask(player, prompt, candidates=null) {
 function checkWin() {
   const alive = game.players.filter(p=>!p.dead);
   const wolves = alive.filter(p=>p.role==='wolf');
-  const village = alive.filter(p=>p.role!=='wolf');
-  if (wolves.length===0) return 'village';
-  if (wolves.length>=village.length) return 'wolves';
+  const nonWolves = alive.filter(p=>p.role!=='wolf');
+  // Lupi vincono se uguagliano o superano i non-lupi
+  if (wolves.length >= nonWolves.length) return 'wolves';
+  // Villaggio vince se tutti i lupi sono morti (il matto non conta come lupo)
+  if (wolves.length === 0) return 'village';
   return null;
 }
 
@@ -1270,22 +1310,27 @@ function getManualRoles(n) {
 }
 
 function assignRoles(players) {
-  const numWolves  = parseInt(document.getElementById('num-wolves')?.value  || '1');
-  const numSeers   = parseInt(document.getElementById('num-seers')?.value   || '1');
-  const numHealers = parseInt(document.getElementById('num-healers')?.value || '1');
+  const numWolves   = parseInt(document.getElementById('num-wolves')?.value   || '1');
+  const numSeers    = parseInt(document.getElementById('num-seers')?.value    || '1');
+  const numHealers  = parseInt(document.getElementById('num-healers')?.value  || '1');
+  const numSheriffs = parseInt(document.getElementById('num-sheriffs')?.value || '0');
+  const numJesters  = parseInt(document.getElementById('num-jesters')?.value  || '0');
   const n = players.length;
 
-  // Costruisci array ruoli
   const roles = [];
-  for (let i=0; i<Math.min(numWolves, n); i++) roles.push('wolf');
-  for (let i=0; i<Math.min(numSeers, n - roles.length); i++) roles.push('seer');
-  for (let i=0; i<Math.min(numHealers, n - roles.length); i++) roles.push('healer');
+  for (let i=0; i<Math.min(numWolves,   n);              i++) roles.push('wolf');
+  for (let i=0; i<Math.min(numSeers,    n-roles.length); i++) roles.push('seer');
+  for (let i=0; i<Math.min(numHealers,  n-roles.length); i++) roles.push('healer');
+  for (let i=0; i<Math.min(numSheriffs, n-roles.length); i++) roles.push('sheriff');
+  for (let i=0; i<Math.min(numJesters,  n-roles.length); i++) roles.push('jester');
   while (roles.length < n) roles.push('villager');
 
-  // Assegna in ordine casuale
   const shuffled = [...players].sort(()=>Math.random()-0.5);
   const rolesCopy = [...roles].sort(()=>Math.random()-0.5);
-  shuffled.forEach((p, i) => { p.role = rolesCopy[i] || 'villager'; });
+  shuffled.forEach((p, i) => {
+    p.role = rolesCopy[i] || 'villager';
+    if (p.role === 'sheriff') p.hasShot = false; // proiettile disponibile
+  });
 }
 
 async function waitForAdvance(label) {
@@ -1321,11 +1366,13 @@ async function runNight() {
   const wolves = alive.filter(p=>p.role==='wolf');
   const seer = alive.find(p=>p.role==='seer');
   const healer = alive.find(p=>p.role==='healer');
+  const sheriff = alive.find(p=>p.role==='sheriff' && !p.hasShot);
   const nonWolves = alive.filter(p=>p.role!=='wolf');
   const names = alive.map(p=>p.name).join(', ');
 
   // Costruisce messaggio suggerimenti adattato ai ruoli vivi
   const rolesAlive = [];
+  if (sheriff) rolesAlive.push(`🔫 Sceriffo (${sheriff.name})`);
   if (healer) rolesAlive.push(`💚 Guaritore (${healer.name})`);
   if (seer) rolesAlive.push(`🔮 Veggente (${seer.name})`);
   if (wolves.length) rolesAlive.push(`🐺 Lupi (${wolves.map(p=>p.name).join(', ')})`);
@@ -1341,61 +1388,85 @@ async function runNight() {
 
   let protected_name = null;
   let killed_name = null;
+  let sheriff_killed = null;
+
+  // ── 0. SCERIFFO (solo se vivo e ha ancora il proiettile) ──
+  if (sheriff) {
+    setStatus(`${sheriff.name} (🔫 sceriffo) decide se sparare...`);
+    const prevStatement = sheriff.nightStatement?.trim();
+    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
+    const prompt = `Sei lo SCERIFFO. Hai UN proiettile per tutta la partita. Puoi scegliere di sparare stanotte oppure aspettare. ${coherenceCtx} Se vuoi sparare, di' "sparo a [nome]". Se vuoi aspettare, di' "aspetto". Giocatori vivi: ${names}. Ragiona strategicamente — rivelare il tuo ruolo ti mette in pericolo.`;
+    const reply = await ask(sheriff, prompt);
+    // Cerca un nome nella risposta — se trovato, spara
+    const shotTarget = alive.filter(p=>p.name!==sheriff.name).find(p=>reply.toLowerCase().includes(p.name.toLowerCase()));
+    if (shotTarget && reply.toLowerCase().includes('spar')) {
+      sheriff.hasShot = true;
+      shotTarget.dead = true;
+      sheriff_killed = shotTarget.name;
+      game.deathLog.push(`${shotTarget.name} sparato dallo Sceriffo (notte ${game.night})`);
+      addNarratorSecret(`🔫 Sceriffo (${sheriff.name}) spara a: <strong>${shotTarget.name}</strong> → ❌ MORTO istantaneamente.`);
+      addEvent(`${shotTarget.name} sparato dallo Sceriffo`, 'kill');
+      playSound('kill');
+    } else {
+      addNarratorSecret(`🔫 Sceriffo (${sheriff.name}) decide di aspettare — proiettile ancora disponibile.`);
+    }
+    await sleep(getDelay()*0.4);
+  }
 
   // ── 1. GUARITORE (solo se vivo) ───────────────────────
-  if (healer) {
+  if (healer && !healer.dead) {
+    const aliveNow = game.players.filter(p=>!p.dead);
     setStatus(`${healer.name} (💚 guaritore) sceglie chi proteggere...`);
     const prevStatement = healer.nightStatement?.trim();
-    const coherenceCtx = prevStatement
-      ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.`
-      : '';
-    const prompt = `Sei il GUARITORE. Devi scegliere chi proteggere stanotte. Puoi scegliere anche te stesso. ${coherenceCtx} Scegli tra: ${names}. Rispondi SOLO con il nome esatto.`;
-    protected_name = await ask(healer, prompt, alive);
+    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.` : '';
+    const prompt = `Sei il GUARITORE. Devi scegliere chi proteggere stanotte. Puoi scegliere anche te stesso. ${coherenceCtx} Scegli tra: ${aliveNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+    protected_name = await ask(healer, prompt, aliveNow);
     addNarratorSecret(`💚 Guaritore (${healer.name}) protegge: <strong>${protected_name}</strong>`);
     await sleep(getDelay()*0.4);
   }
 
   // ── 2. VEGGENTE (solo se vivo) ────────────────────────
-  if (seer) {
-    const targets = alive.filter(p=>p.name!==seer.name);
+  if (seer && !seer.dead) {
+    const aliveNow = game.players.filter(p=>!p.dead);
+    const targets = aliveNow.filter(p=>p.name!==seer.name);
     setStatus(`${seer.name} (🔮 veggente) sceglie chi investigare...`);
     const prevStatement = seer.nightStatement?.trim();
-    const coherenceCtx = prevStatement
-      ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.`
-      : '';
-    // Il veggente conosce i lupi già scoperti — li include nel contesto
+    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.` : '';
     const knownWolves = (seer.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
     const knownInnocent = (seer.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
+    const unseenTargets = targets.filter(p=>!(seer.seenPlayers||[]).find(s=>s.name===p.name));
     const seerKnowledge = knownWolves.length
       ? `Sai già che questi sono LUPI: ${knownWolves.join(', ')}. Considera se rivelare questa info al villaggio o tenerla segreta per non farti eliminare.`
       : knownInnocent.length ? `Hai già verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
-    const prompt = `Sei il VEGGENTE. ${seerKnowledge} ${coherenceCtx} Scegli chi investigare tra: ${targets.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
-    const choice = await ask(seer, prompt, targets);
+    const prompt = `Sei il VEGGENTE. ${seerKnowledge} ${coherenceCtx} Scegli chi investigare tra: ${(unseenTargets.length?unseenTargets:targets).map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+    const choice = await ask(seer, prompt, unseenTargets.length?unseenTargets:targets);
     const target = game.players.find(p=>p.name===choice);
     if (target) {
       if (!seer.seenPlayers) seer.seenPlayers=[];
-      // Evita duplicati
       if (!seer.seenPlayers.find(s=>s.name===target.name)) {
         seer.seenPlayers.push({name:target.name, isWolf:target.role==='wolf'});
       }
-      const roleLabel = target.role==='wolf' ? '🐺 LUPO' : `👤 ${target.role==='seer'?'Veggente':target.role==='healer'?'Guaritore':'Villager'}`;
+      const roleLabel = target.role==='wolf' ? '🐺 LUPO' : `👤 ${target.role==='seer'?'Veggente':target.role==='healer'?'Guaritore':target.role==='sheriff'?'Sceriffo':target.role==='jester'?'Matto':'Villager'}`;
       addNarratorSecret(`🔮 Veggente (${seer.name}) investiga: <strong>${target.name}</strong> → ruolo: <strong>${roleLabel}</strong>`);
     }
     await sleep(getDelay()*0.4);
   }
 
   // ── 3. LUPI (solo se vivi) ────────────────────────────
-  if (wolves.length>0 && nonWolves.length>0) {
-    setStatus(`Lupi (${wolves.map(p=>p.name).join(', ')}) scelgono la vittima...`);
-    const wolfAlliesCtx = wolves.length > 1
-      ? `Siete in squadra con: ${wolves.map(p=>p.name).join(', ')}. Coordinate la scelta per eliminare il bersaglio più pericoloso.`
+  const aliveNow = game.players.filter(p=>!p.dead);
+  const wolvesNow = aliveNow.filter(p=>p.role==='wolf');
+  const nonWolvesNow = aliveNow.filter(p=>p.role!=='wolf');
+  if (wolvesNow.length>0 && nonWolvesNow.length>0) {
+    setStatus(`Lupi (${wolvesNow.map(p=>p.name).join(', ')}) scelgono la vittima...`);
+    const wolfAlliesCtx = wolvesNow.length > 1
+      ? `Siete in squadra con: ${wolvesNow.map(p=>p.name).join(', ')}. Coordinate la scelta per eliminare il bersaglio più pericoloso.`
       : `Sei l'unico lupo rimasto.`;
-    const prevStatement = wolves.map(p=>p.nightStatement?.trim()).filter(Boolean).join(' / ');
-    const coherenceCtx = prevStatement
-      ? `Il lupo/i lupi hanno detto al narratore: "${prevStatement}". La scelta deve essere coerente.`
-      : '';
-    const prompt = `Sei un LUPO. ${wolfAlliesCtx} ${coherenceCtx} Scegli chi eliminare stanotte tra: ${nonWolves.map(p=>p.name).join(', ')}. Scegli il bersaglio più pericoloso (veggente, guaritore, o chi vi sospetta). Rispondi SOLO con il nome esatto.`;
-    killed_name = await ask(wolves[0], prompt, nonWolves);
+    const prevStatement = wolvesNow.map(p=>p.nightStatement?.trim()).filter(Boolean).join(' / ');
+    const coherenceCtx = prevStatement ? `Il lupo/i lupi hanno detto al narratore: "${prevStatement}". La scelta deve essere coerente.` : '';
+    const hasMatto = nonWolvesNow.some(p=>p.role==='jester');
+    const mattoCtx = hasMatto ? ` ATTENZIONE: c'è un Matto in gioco — se viene votato dal villaggio vince lui. Considera se conviene lasciarlo vivo per confondere il villaggio.` : '';
+    const prompt = `Sei un LUPO. ${wolfAlliesCtx} ${coherenceCtx}${mattoCtx} Scegli chi eliminare stanotte tra: ${nonWolvesNow.map(p=>p.name).join(', ')}. Scegli il bersaglio più pericoloso (veggente, guaritore, sceriffo, o chi vi sospetta). Rispondi SOLO con il nome esatto.`;
+    killed_name = await ask(wolvesNow[0], prompt, nonWolvesNow);
 
     if (killed_name === protected_name) {
       addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ✅ SALVATO dal Guaritore! Nessuno muore stanotte.`);
@@ -1404,7 +1475,7 @@ async function runNight() {
       killed_name = null;
     } else {
       const victim = game.players.find(p=>p.name===killed_name);
-      if (victim) {
+      if (victim && !victim.dead) {
         const protectedInfo = protected_name
           ? `Il Guaritore proteggeva ${protected_name}, non ${killed_name}.`
           : 'Nessun Guaritore in campo.';
@@ -1418,7 +1489,7 @@ async function runNight() {
   }
 
   await sleep(getDelay()*0.5);
-  return killed_name;
+  return { killed: killed_name, sheriffKilled: sheriff_killed };
 }
 
 function addNarratorSecret(html) {
@@ -1430,7 +1501,10 @@ function addNarratorSecret(html) {
   wrap.scrollIntoView({behavior:'smooth'});
 }
 
-async function runDay(nightVictim) {
+async function runDay(nightResult) {
+  const killed = nightResult?.killed || nightResult || null;
+  const sheriffKilled = nightResult?.sheriffKilled || null;
+
   const alive = game.players.filter(p=>!p.dead);
   game.phase = 'day';
   setPhase(`Giorno ${game.night}`, 'day');
@@ -1441,22 +1515,49 @@ async function runDay(nightVictim) {
   updateSuggestions();
   updateNarratorTargets();
 
-  if (nightVictim) {
-    addSystemMsg(`L'alba porta una notizia tragica: ${nightVictim} non c'è più. Il villaggio si riunisce.`);
-    addEvent(`${nightVictim} trovato eliminato`, 'kill');
-  } else {
+  // Annunci morti della notte
+  if (sheriffKilled) {
+    const sheriffName = game.players.find(p=>p.role==='sheriff')?.name || 'Lo Sceriffo';
+    addSystemMsg(`🔫 Nella notte lo Sceriffo ha sparato: ${sheriffKilled} è stato ucciso!`);
+    addEvent(`${sheriffKilled} sparato dallo Sceriffo`, 'kill');
+  }
+  if (killed) {
+    addSystemMsg(`L'alba porta una notizia tragica: ${killed} non c'è più. Il villaggio si riunisce.`);
+    addEvent(`${killed} trovato eliminato`, 'kill');
+  }
+  if (!killed && !sheriffKilled) {
     addSystemMsg(`Nessuno è morto stanotte. I lupi sono ancora tra noi.`);
   }
   await sleep(getDelay()*0.5);
 
-  // Storico dei messaggi della discussione — passato a ogni AI
+  // Info ruoli in gioco per il contesto strategie
+  const hasMatto = game.players.some(p=>p.role==='jester'&&!p.dead);
+  const hasSheriff = game.players.some(p=>p.role==='sheriff'&&!p.dead);
+  const rolesInGame = game.players.filter(p=>!p.dead).map(p=>p.role);
+
+  // Strategie comuni a tutti
+  const commonStrategies = `Strategie disponibili:
+- Accountability Framework: proponi che tutti giustifichino ogni voto con prove concrete
+- Graveyard Analysis: analizza le morti passate e correlale ai comportamenti diurni
+- Pattern di voto: traccia incoerenze nei voti di tutti i giorni precedenti ("hai votato X il giorno 1 e ora lo difendi, perché?")
+- Accusare i silenziosi: chi non prende mai posizione sta nascondendo qualcosa
+- Rules Lawyering: usa la logica matematica per dimostrare la tua innocenza
+- Behavioral Analysis: osserva il comportamento emotivo, non solo la logica
+- LYLO Awareness: quando i numeri sono critici cambia completamente strategia
+- Silenzio strategico: non prendere posizione, osserva come reagiscono gli altri
+- Redemption Arc: lasciati accusare, smonta l'accusa con prove, esci più credibile${hasMatto?' - Attenzione al Matto: potrebbe cercare di farsi accusare deliberatamente — non cadere nella sua trappola':''}`;
+
+  const storico = discussionHistory => discussionHistory.length > 0
+    ? `\n\nEcco cosa è stato detto finora:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
+    : '';
+
+  // Storico dei messaggi della discussione
   const discussionHistory = [];
 
-  // 3 giri completi di discussione
+  // 3 giri completi di discussione con diritto di replica
   for (let round = 1; round <= 3; round++) {
     addSep(`— DISCUSSIONE — turno ${round}/3`);
     const aliveCurrent = game.players.filter(p=>!p.dead);
-    const order = aliveCurrent.map(p=>p.name).join(', ');
 
     for (let i = 0; i < aliveCurrent.length; i++) {
       const p = aliveCurrent[i];
@@ -1464,35 +1565,53 @@ async function runDay(nightVictim) {
       await waitIfPaused();
 
       // Contesto ordine solo al primo turno
-      const alreadySpoke = aliveCurrent.slice(0,i).map(p=>p.name);
-      const yetToSpeak = aliveCurrent.slice(i+1).map(p=>p.name);
+      const alreadySpoke = aliveCurrent.slice(0,i).map(x=>x.name);
+      const yetToSpeak = aliveCurrent.slice(i+1).map(x=>x.name);
       const orderCtx = round===1
-        ? ` ${alreadySpoke.length ? `In questo turno hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio.` : 'Sei l\'ultimo a parlare.'}`
+        ? ` ${alreadySpoke.length ? `Hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio ancora.` : 'Sei l\'ultimo a parlare.'}`
         : '';
 
-      // Storico discussione passato all'AI
-      const historyCtx = discussionHistory.length > 0
-        ? `\n\nEcco cosa è stato detto finora nella discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}\n\nRispondi direttamente a quello che hanno detto, specialmente se qualcuno ti ha nominato o ha fatto osservazioni su di te.`
-        : '';
+      const historyCtx = storico(discussionHistory);
 
       const baseCtx = round===1
-        ? (nightVictim
-            ? `È giorno ${game.night}. Stanotte ${nightVictim} è stato eliminato. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
+        ? (killed||sheriffKilled
+            ? `È giorno ${game.night}. Stanotte ${[sheriffKilled,killed].filter(Boolean).join(' e ')} ${sheriffKilled&&killed?'sono stati eliminati':' è stato eliminato'}. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
             : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
         : round===2
-        ? `Turno 2 di discussione. Rispondi a quello che hanno detto gli altri, difenditi se necessario, e approfondisci i tuoi sospetti.`
-        : `Turno finale prima del voto. Esprimi il tuo verdetto definitivo su chi vuoi eliminare e perché, rispondendo anche a chi ti ha accusato.`;
+        ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti.`
+        : `Turno finale prima del voto. Esprimi il tuo verdetto definitivo su chi vuoi eliminare e perché.`;
 
-      const ctx = `${baseCtx}${orderCtx}${historyCtx}`;
+      const ctx = `${baseCtx}${orderCtx}${historyCtx}\n\n${commonStrategies}\n\nNon reagire meccanicamente all'ultimo parlante — osserva i pattern complessivi e scegli la strategia più efficace per i tuoi obiettivi.`;
 
       showThinking(p);
       setStatus(`${p.name} parla (turno ${round}/3)...`);
       const reply = await ask(p, ctx);
       removeThinking();
       addMsg(p, reply, 'day');
-
-      // Aggiungi al storico per le AI successive
       discussionHistory.push({name: p.name, text: reply});
+
+      // ── DIRITTO DI REPLICA ────────────────────────────
+      // Cerca se qualcuno viene accusato nel messaggio
+      const accusedPlayers = aliveCurrent.filter(accused =>
+        accused.name !== p.name &&
+        reply.toLowerCase().includes(accused.name.toLowerCase())
+      );
+
+      for (const accused of accusedPlayers) {
+        if (!isRunning) break;
+        await waitIfPaused();
+        await sleep(getDelay()*0.5);
+
+        showThinking(accused);
+        setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
+        const replyCtx = `${p.name} ha appena parlato di te nel suo intervento: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi, ma la tua risposta non dà diritto ad ulteriori repliche.${historyCtx}\n\n${commonStrategies}`;
+        const replyMsg = await ask(accused, replyCtx);
+        removeThinking();
+        addMsg(accused, replyMsg, 'day');
+        discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
+        await sleep(getDelay()*0.8);
+      }
+      // ─────────────────────────────────────────────────
 
       await sleep(getDelay()*1.2);
     }
@@ -1514,7 +1633,6 @@ async function runDay(nightVictim) {
   const aliveFinal = game.players.filter(p=>!p.dead);
   for (const p of aliveFinal) votes[p.name]=0;
 
-  // Passiamo anche lo storico discussione al momento del voto
   const voteSummary = discussionHistory.length>0
     ? `\n\nRiassunto della discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
     : '';
@@ -1536,13 +1654,20 @@ async function runDay(nightVictim) {
   const top = Object.entries(votes).filter(([_,v])=>v===maxV).map(([n])=>n);
   const eliminated = top[Math.floor(Math.random()*top.length)];
   const target = game.players.find(p=>p.name===eliminated);
+
   if (target) {
     target.dead=true;
-    const rmap={wolf:'🐺 un LUPO',seer:'🔮 il Veggente',healer:'💚 il Guaritore',villager:'👤 un innocente'};
+    const rmap={wolf:'🐺 un LUPO',seer:'🔮 il Veggente',healer:'💚 il Guaritore',sheriff:'🔫 lo Sceriffo',jester:'🃏 il Matto',villager:'👤 un innocente'};
     game.deathLog.push(`${target.name} bandito (giorno ${game.night})`);
     addSystemMsg(`Il verdetto: ${eliminated} viene bandito. Era ${rmap[target.role]}!`);
-    addEvent(`${eliminated} bandito (${target.role==='wolf'?'LUPO!':'innocente'})`, 'vote');
+    addEvent(`${eliminated} bandito (${target.role==='wolf'?'LUPO!':target.role==='jester'?'MATTO!':'innocente'})`, 'vote');
     playSound('kill');
+
+    // Controlla vittoria Matto
+    if (target.role === 'jester') {
+      showWin('jester');
+      return;
+    }
   }
 
   // Salva riassunto del giorno nella memoria storica
@@ -1556,14 +1681,34 @@ async function runDay(nightVictim) {
   updatePlayersList(); updateStats();
 }
 
+function stopGame() {
+  if (!isRunning) return;
+  isRunning = false;
+  isPaused = false;
+  if (pauseResolve) { pauseResolve(); pauseResolve = null; }
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('start-btn').disabled = false;
+  document.getElementById('start-btn').textContent = 'Nuova Partita';
+  document.getElementById('advance-btn').style.display = 'none';
+  addSystemMsg('⏹ Partita interrotta dal narratore.');
+  setPhase('interrotta');
+  updatePlayersList();
+}
+
 function showWin(winner) {
   game.gameOver=true; updatePlayersList();
   playSound('win');
-  const rmap={wolf:'🐺 Lupo',seer:'🔮 Veggente',healer:'💚 Guaritore',villager:'👤 Villager'};
+  const rmap={wolf:'🐺 Lupo',seer:'🔮 Veggente',healer:'💚 Guaritore',sheriff:'🔫 Sceriffo',jester:'🃏 Matto',villager:'👤 Villager'};
   document.getElementById('win-roles').textContent = game.players
     .map(p=>`${p.emoji} ${p.name} [${p.providerLabel}] — ${rmap[p.role]}${p.dead?' (eliminato)':''}`)
     .join('\n');
-  if (winner==='village') {
+  if (winner==='jester') {
+    document.getElementById('win-title').textContent='Il Matto Vince!';
+    document.getElementById('win-title').style.color='#6d28d9';
+    const jester = game.players.find(p=>p.role==='jester'&&p.dead);
+    document.getElementById('win-subtitle').textContent=`${jester?.name||'Il Matto'} è riuscito a farsi eliminare dal villaggio!`;
+    addEvent('🃏 Vittoria del Matto!','win');
+  } else if (winner==='village') {
     document.getElementById('win-title').textContent='Il Villaggio Vince!';
     document.getElementById('win-title').style.color='#14532d';
     document.getElementById('win-subtitle').textContent=`I lupi smascherati: ${game.players.filter(p=>p.role==='wolf').map(p=>p.name).join(', ')}.`;
@@ -1576,17 +1721,18 @@ function showWin(winner) {
   }
   document.getElementById('win-overlay').classList.add('show');
   isRunning=false;
+  document.getElementById('stop-btn').style.display='none';
   const btn=document.getElementById('start-btn');
   btn.disabled=false; btn.textContent='Nuova Partita';
 }
 
 async function runGame() {
   while (isRunning) {
-    const victim = await runNight();
+    const nightResult = await runNight();
     updatePlayersList(); updateStats();
     const w1=checkWin(); if(w1){showWin(w1);return;}
     await sleep(getDelay()*1.5);
-    await runDay(victim);
+    await runDay(nightResult);
     const w2=checkWin(); if(w2){showWin(w2);return;}
     await sleep(getDelay()*1.5);
   }
@@ -1636,9 +1782,18 @@ function startGame() {
   updateNarratorTargets(); updateSuggestions();
   isRunning=true;
   setPhase('partita in corso');
+  document.getElementById('stop-btn').style.display='inline-block';
+
+  // Annuncio ruoli presenti
+  const roleCount = {};
+  game.players.forEach(p => { roleCount[p.role] = (roleCount[p.role]||0)+1; });
+  const rnames = {wolf:'🐺 Lupo',seer:'🔮 Veggente',healer:'💚 Guaritore',sheriff:'🔫 Sceriffo',jester:'🃏 Matto',villager:'👤 Villager'};
+  const roleAnnounce = Object.entries(roleCount).map(([r,c])=>`${c} ${rnames[r]}`).join(', ');
+  const hasMatto = roleCount['jester']>0;
 
   const lineup=game.players.map(p=>`${p.emoji} ${p.name}`).join(', ');
-  addSystemMsg(`Partita iniziata! Giocatori: ${lineup}. I ruoli sono segreti.`);
+  addSystemMsg(`Partita iniziata! Giocatori: ${lineup}.`);
+  addSystemMsg(`📋 Ruoli in gioco: ${roleAnnounce}.${hasMatto?' Il Matto gioca per sé — se viene votato vince!':''}`);
   addEvent('Partita iniziata','');
 
   runGame().catch(e=>{
