@@ -994,7 +994,6 @@ function updateSuggestions() {
   const names = alive.map(p=>p.name).join(', ');
 
   if (game.phase === 'night') {
-    const names = alivePlayers.map(p=>p.name).join(', ');
 
     if (sheriff) {
       const btn = document.createElement('button');
