@@ -256,6 +256,12 @@
       </div>
       <span style="font-size:0.62rem;color:var(--text-faint);font-family:var(--font-mono,monospace)">il resto sarà villager</span>
     </div>
+    <div style="margin-top:0.9rem;display:flex;align-items:center;gap:0.5rem">
+      <input type="checkbox" id="player-mode" style="cursor:pointer">
+      <label for="player-mode" style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif">
+        👤 Gioca come player — sei contato nel numero di giocatori, ricevi un ruolo casuale
+      </label>
+    </div>
   </div>
 </div>
 
@@ -267,6 +273,15 @@
 
   <div id="chat-area">
     <div id="chat-log"></div>
+
+    <!-- PLAYER INPUT (solo in modalità player, quando è il tuo turno) -->
+    <div id="player-input-area" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.75rem;margin:0.5rem 0.75rem;">
+      <div style="font-size:0.7rem;color:#1e40af;font-family:'DM Mono',monospace;margin-bottom:0.4rem" id="player-input-label">💬 È il tuo turno — scrivi il tuo messaggio</div>
+      <div style="display:flex;gap:0.5rem">
+        <input type="text" id="player-input" placeholder="Scrivi qui..." style="flex:1;padding:0.4rem 0.7rem;border:1px solid #bfdbfe;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.8rem;outline:none" />
+        <button id="player-send-btn" style="padding:0.4rem 1rem;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.75rem;font-weight:500">Invia</button>
+      </div>
+    </div>
 
     <!-- NARRATOR BAR -->
     <div id="narrator-bar">
@@ -876,9 +891,10 @@ function addSep(text) {
 function addMsg(player, text, tag='', secret=false) {
   const log = document.getElementById('chat-log');
   const wrap = document.createElement('div');
-  wrap.className = 'msg' + (secret ? ' secret' : '');
+  wrap.className = 'msg' + (secret ? ' secret' : '') + (player.isHuman ? ' human-msg' : '');
   const tagHTML = tag ? `<span class="msg-tag tag-${tag}">${tag}</span>` : '';
   const secretBadge = secret ? `<span class="msg-badge" style="background:#eef2ff;color:#6366f1;border-color:#c7d2fe">🔒 segreto</span>` : '';
+  const humanBadge = player.isHuman ? `<span class="msg-badge" style="background:#fef3c7;color:#92400e;border-color:#fde68a">👤 tu</span>` : '';
   const hintHTML = secret ? `<div class="secret-hint">clicca per rivelare</div>` : '';
   wrap.innerHTML = `
     <div class="msg-avatar" style="background:${player.bg||'#f0ede6'}">${player.emoji}</div>
@@ -886,6 +902,7 @@ function addMsg(player, text, tag='', secret=false) {
       <div class="msg-header">
         <span class="msg-name">${player.name}</span>
         <span class="msg-badge">${player.providerLabel}</span>
+        ${humanBadge}
         ${secretBadge}
         <span class="msg-time">${timeStr()}</span>
         ${tagHTML}
@@ -944,11 +961,11 @@ function updatePlayersList() {
     const showRole = p.dead || game.gameOver;
     const roleLabel = showRole ? (roleMap[p.role]||p.role) : '— ruolo segreto';
     const stClass = p.dead ? 'status-dead' : (game.gameOver&&p.role==='wolf' ? 'status-wolf' : 'status-alive');
-    const stText = p.dead ? 'eliminato' : (game.gameOver&&p.role==='wolf' ? 'lupo!' : 'in vita');
+    const stText = p.dead ? 'eliminato' : (game.gameOver&&p.role==='wolf' ? 'lupo!' : p.isHuman ? '👤 tu' : 'in vita');
     card.innerHTML = `
       <div class="avatar" style="background:${p.bg||'#f0ede6'}">${p.emoji}</div>
       <div class="player-info">
-        <div class="player-name">${p.name}</div>
+        <div class="player-name">${p.name}${p.isHuman?' 👤':''}</div>
         <div class="player-meta">${p.providerLabel}</div>
         <div class="player-role-label">${roleLabel}</div>
       </div>
@@ -1097,8 +1114,70 @@ async function askRoleDirectly(targetNames, message) {
 }
 
 // ═══════════════════════════════════════════════════════
-// PAUSE / RESUME
+// PLAYER MODE
 // ═══════════════════════════════════════════════════════
+function isPlayerMode() {
+  return document.getElementById('player-mode')?.checked && game?.humanPlayer;
+}
+
+function waitForPlayerInput(label) {
+  return new Promise(resolve => {
+    const area = document.getElementById('player-input-area');
+    const input = document.getElementById('player-input');
+    const btn = document.getElementById('player-send-btn');
+    const labelEl = document.getElementById('player-input-label');
+    labelEl.textContent = label;
+    area.style.display = 'block';
+    input.value = '';
+    input.focus();
+    area.scrollIntoView({behavior:'smooth'});
+
+    const submit = () => {
+      const val = input.value.trim();
+      if (!val) return;
+      area.style.display = 'none';
+      input.removeEventListener('keydown', onKey);
+      btn.removeEventListener('click', submit);
+      resolve(val);
+    };
+    const onKey = e => { if (e.key === 'Enter') submit(); };
+    input.addEventListener('keydown', onKey);
+    btn.addEventListener('click', submit);
+  });
+}
+
+function waitForPlayerChoice(label, options) {
+  return new Promise(resolve => {
+    const area = document.getElementById('player-input-area');
+    const labelEl = document.getElementById('player-input-label');
+    labelEl.textContent = label;
+
+    // Crea bottoni per le scelte
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.4rem';
+    options.forEach(opt => {
+      const b = document.createElement('button');
+      b.textContent = opt;
+      b.style.cssText = 'padding:0.3rem 0.7rem;background:#fff;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;font-size:0.75rem;font-family:\'DM Sans\',sans-serif';
+      b.onclick = () => {
+        btnRow.remove();
+        document.getElementById('player-input').style.display = 'block';
+        document.getElementById('player-send-btn').style.display = 'block';
+        area.style.display = 'none';
+        resolve(opt);
+      };
+      btnRow.appendChild(b);
+    });
+
+    document.getElementById('player-input').style.display = 'none';
+    document.getElementById('player-send-btn').style.display = 'none';
+    area.appendChild(btnRow);
+    area.style.display = 'block';
+    area.scrollIntoView({behavior:'smooth'});
+  });
+}
+
+
 async function waitIfPaused() {
   if (!isPaused) return;
   await new Promise(resolve => { pauseResolve = resolve; });
@@ -1213,7 +1292,10 @@ function buildSysPrompt(player) {
     const innocentCtx = knownInnocent.length ? ` Verificati innocenti: ${knownInnocent.join(', ')}.` : '';
     roleInfo = `Sei il VEGGENTE. ${strategyCtx}${innocentCtx} Strategie extra: Clutch Reveal (rivela le info nel momento di massimo impatto), Soft Reveal (insinua senza rivelare per guidare il voto), Protezione preventiva (chiedi al guaritore di proteggerti prima di rivelare), Detective Credibility (costruisci credibilità nei giorni precedenti per dare più peso alla tua rivelazione). Agli occhi del villaggio sembri un cittadino normale.`;
   } else if (player.role==='healer') {
-    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno dalla morte. Strategie extra: Threat Assessment (proteggi chi è più sotto accusa quel giorno), Self-preservation (proteggiti quando sei sotto pressione), Veggente Shield (se intuisci chi è il veggente proteggilo sistematicamente). Agli occhi del villaggio sembri un cittadino normale.`;
+    const savedCtx = player.lastSaved
+      ? ` Nota importante: nella notte scorsa hai protetto ${player.lastSaved} e quella persona è ancora viva — significa che i lupi avevano scelto proprio ${player.lastSaved} come bersaglio. Questo ti dà quasi la certezza che ${player.lastSaved} NON sia un lupo (i lupi non si eliminano tra loro). Usa questa informazione con strategia — potresti difenderlo pubblicamente, proteggerlo di nuovo, o condividere questa deduzione col villaggio al momento giusto.`
+      : '';
+    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno dalla morte.${savedCtx} Strategie extra: Threat Assessment (proteggi chi è più sotto accusa quel giorno), Self-preservation (proteggiti quando sei sotto pressione), Veggente Shield (se intuisci chi è il veggente proteggilo sistematicamente). Agli occhi del villaggio sembri un cittadino normale.`;
   } else if (player.role==='sheriff') {
     const bulletCtx = player.hasShot ? `Hai già usato il tuo proiettile.` : `Hai ancora il proiettile disponibile. Usalo con saggezza — rivelare il tuo ruolo ti mette in pericolo perché i lupi ti elimineranno prima che tu possa sparare.`;
     roleInfo = `Sei lo SCERIFFO. ${bulletCtx} Strategie extra: Timing del proiettile (aspetta di avere prove concrete prima di sparare), Sinergia col villaggio (coordina il tuo sparo con il voto — il villaggio vota un sospettato mentre tu spari al lupo confermato), Rivela il ruolo solo se hai prove solide e sei in una posizione sicura. Agli occhi del villaggio sembri un cittadino normale.`;
@@ -1227,7 +1309,9 @@ function buildSysPrompt(player) {
 Ruolo segreto: ${roleInfo}
 Giocatori vivi: ${alive}
 Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}
-Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente.`;
+Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente. Puoi essere autocosciente di essere un modello AI — è parte del tuo personaggio — ma comportati da giocatore del villaggio, non da assistente. Non fare disclaimer, non analizzare la situazione ad alta voce, vai dritto al punto in gioco.
+
+Strategie disponibili (usale senza dichiararle esplicitamente): Accountability Framework, Graveyard Analysis, Pattern di voto su tutti i giorni, Accusare i silenziosi, Rules Lawyering, Behavioral Analysis, LYLO Awareness, Silenzio strategico, Redemption Arc.`;
 }
 
 function buildHistoryCtx(player) {
@@ -1382,8 +1466,14 @@ async function runNight() {
 
   addSystemMsg(`🌙 Notte ${game.night} — Ruoli attivi: ${rolesAlive.join(', ')}. Interrogali nell'ordine suggerito poi premi "Avanza verso l'alba".`);
   setStatus('In attesa del narratore...');
-  await waitForAdvance('☀️ Avanza verso l\'alba');
-  await waitIfPaused();
+
+  // In modalità player la notte avanza automaticamente
+  if (!game.humanPlayer) {
+    await waitForAdvance('☀️ Avanza verso l\'alba');
+    await waitIfPaused();
+  } else {
+    await sleep(getDelay());
+  }
 
   let protected_name = null;
   let killed_name = null;
@@ -1471,6 +1561,9 @@ async function runNight() {
       addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ✅ SALVATO dal Guaritore! Nessuno muore stanotte.`);
       addEvent(`${killed_name} salvato dal Guaritore`, 'night');
       playSound('save');
+      // Il guaritore sa di aver salvato qualcuno
+      const healerPlayer = game.players.find(p=>p.role==='healer'&&!p.dead);
+      if (healerPlayer) healerPlayer.lastSaved = killed_name;
       killed_name = null;
     } else {
       const victim = game.players.find(p=>p.name===killed_name);
@@ -1488,6 +1581,86 @@ async function runNight() {
   }
 
   await sleep(getDelay()*0.5);
+
+  // ── GIOCATORE UMANO (notte) ───────────────────────────
+  const human = game.humanPlayer;
+  if (human && !human.dead) {
+    if (human.role === 'wolf') {
+      // Mostra i messaggi dei compagni lupi come segreti
+      const wolfAllies = game.players.filter(p=>p.role==='wolf'&&!p.dead&&!p.isHuman);
+      if (wolfAllies.length) {
+        addNarratorSecret(`🐺 I tuoi compagni lupi: <strong>${wolfAllies.map(p=>p.name).join(', ')}</strong>`);
+      }
+      // L'umano decide chi eliminare (sovrascrive la scelta AI)
+      const nonWolvesNow2 = game.players.filter(p=>!p.dead&&p.role!=='wolf');
+      if (nonWolvesNow2.length) {
+        const choiceStr = await waitForPlayerChoice(
+          `🐺 Sei il LUPO — scegli chi eliminare stanotte`,
+          nonWolvesNow2.map(p=>p.name)
+        );
+        // Annulla eventuale vittima già scelta dalle AI e usa quella umana
+        if (killed_name) {
+          const prevVictim = game.players.find(p=>p.name===killed_name);
+          if (prevVictim) prevVictim.dead = false; // ripristina
+        }
+        const newVictim = game.players.find(p=>p.name===choiceStr);
+        if (newVictim && newVictim.name !== protected_name) {
+          newVictim.dead = true;
+          killed_name = newVictim.name;
+          game.deathLog.push(`${newVictim.name} ucciso dai lupi (notte ${game.night})`);
+          addNarratorSecret(`🐺 Hai scelto di eliminare: <strong>${newVictim.name}</strong>`);
+        } else if (newVictim && newVictim.name === protected_name) {
+          killed_name = null;
+          addNarratorSecret(`🐺 Hai scelto ${choiceStr} ma il Guaritore lo proteggeva — ✅ SALVATO!`);
+        }
+      }
+    } else if (human.role === 'seer') {
+      const targets2 = game.players.filter(p=>!p.dead&&p.name!==human.name);
+      const unseen = targets2.filter(p=>!(human.seenPlayers||[]).find(s=>s.name===p.name));
+      const pool = unseen.length ? unseen : targets2;
+      const choiceStr = await waitForPlayerChoice(
+        `🔮 Sei il VEGGENTE — scegli chi investigare`,
+        pool.map(p=>p.name)
+      );
+      const target2 = game.players.find(p=>p.name===choiceStr);
+      if (target2) {
+        if (!human.seenPlayers) human.seenPlayers=[];
+        if (!human.seenPlayers.find(s=>s.name===target2.name)) {
+          human.seenPlayers.push({name:target2.name, isWolf:target2.role==='wolf'});
+        }
+        const roleLabel2 = target2.role==='wolf' ? '🐺 LUPO' : `👤 ${target2.role==='seer'?'Veggente':target2.role==='healer'?'Guaritore':target2.role==='sheriff'?'Sceriffo':target2.role==='jester'?'Matto':'Villager'}`;
+        addNarratorSecret(`🔮 Hai investigato: <strong>${target2.name}</strong> → ruolo: <strong>${roleLabel2}</strong>`);
+      }
+    } else if (human.role === 'healer') {
+      const aliveAll = game.players.filter(p=>!p.dead);
+      const choiceStr = await waitForPlayerChoice(
+        `💚 Sei il GUARITORE — scegli chi proteggere (puoi anche scegliere te stesso)`,
+        aliveAll.map(p=>p.name)
+      );
+      protected_name = choiceStr;
+      addNarratorSecret(`💚 Hai protetto: <strong>${protected_name}</strong>`);
+    } else if (human.role === 'sheriff' && !human.hasShot) {
+      const aliveOthers = game.players.filter(p=>!p.dead&&p.name!==human.name);
+      const options = [...aliveOthers.map(p=>p.name), '— Non sparare questa notte'];
+      const choiceStr = await waitForPlayerChoice(
+        `🔫 Sei lo SCERIFFO — vuoi usare il tuo proiettile?`,
+        options
+      );
+      if (!choiceStr.startsWith('—')) {
+        human.hasShot = true;
+        const shotTarget2 = game.players.find(p=>p.name===choiceStr);
+        if (shotTarget2) {
+          shotTarget2.dead = true;
+          sheriff_killed = shotTarget2.name;
+          game.deathLog.push(`${shotTarget2.name} sparato dallo Sceriffo (notte ${game.night})`);
+          addNarratorSecret(`🔫 Hai sparato a: <strong>${shotTarget2.name}</strong> → ❌ MORTO istantaneamente.`);
+        }
+      } else {
+        addNarratorSecret(`🔫 Hai deciso di non sparare — proiettile ancora disponibile.`);
+      }
+    }
+  }
+
   return { killed: killed_name, sheriffKilled: sheriff_killed };
 }
 
@@ -1501,8 +1674,8 @@ function addNarratorSecret(html) {
 }
 
 async function runDay(nightResult) {
-  const killed = nightResult?.killed || nightResult || null;
-  const sheriffKilled = nightResult?.sheriffKilled || null;
+  const killed = typeof nightResult === 'object' ? nightResult?.killed : nightResult;
+  const sheriffKilled = typeof nightResult === 'object' ? nightResult?.sheriffKilled : null;
 
   const alive = game.players.filter(p=>!p.dead);
   game.phase = 'day';
@@ -1578,15 +1751,25 @@ async function runDay(nightResult) {
             : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
         : round===2
         ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti.`
-        : `Turno finale prima del voto. Esprimi il tuo verdetto definitivo su chi vuoi eliminare e perché.`;
+        : `Turno 3 di discussione. Continua il dibattito, rispondi a chi ti ha accusato, porta nuovi argomenti o rafforza i tuoi. Non devi ancora dichiarare il tuo voto.`;
 
-      const ctx = `${baseCtx}${orderCtx}${historyCtx}\n\n${commonStrategies}\n\nNon reagire meccanicamente all'ultimo parlante — osserva i pattern complessivi e scegli la strategia più efficace per i tuoi obiettivi.`;
+      const ctx = `${baseCtx}${orderCtx}${historyCtx}
 
-      showThinking(p);
-      setStatus(`${p.name} parla (turno ${round}/3)...`);
-      const reply = await ask(p, ctx);
-      removeThinking();
-      addMsg(p, reply, 'day');
+Parla direttamente in personaggio — non analizzare la situazione ad alta voce, non elencare le tue considerazioni, non fare ragionamenti espliciti sulle strategie. Vai dritto al punto con una dichiarazione in gioco.`;
+
+      // Turno umano o AI
+      let reply;
+      if (p.isHuman) {
+        const label = `💬 È il tuo turno (turno ${round}/3) — parla in gioco`;
+        reply = await waitForPlayerInput(label);
+        addMsg(p, reply, 'day');
+      } else {
+        showThinking(p);
+        setStatus(`${p.name} parla (turno ${round}/3)...`);
+        reply = await ask(p, ctx);
+        removeThinking();
+        addMsg(p, reply, 'day');
+      }
       discussionHistory.push({name: p.name, text: reply});
 
       // ── DIRITTO DI REPLICA ────────────────────────────
@@ -1617,11 +1800,15 @@ async function runDay(nightResult) {
     if (round < 3) await sleep(getDelay()*0.5);
   }
 
-  // Narratore decide quando passare al voto
-  addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
-  setStatus('In attesa del narratore...');
-  await waitForAdvance('🗳️ Avanza al voto');
-  await waitIfPaused();
+  // In modalità player la partita avanza automaticamente, altrimenti aspetta il narratore
+  if (!game.humanPlayer) {
+    addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
+    setStatus('In attesa del narratore...');
+    await waitForAdvance('🗳️ Avanza al voto');
+    await waitIfPaused();
+  } else {
+    await sleep(getDelay()*0.5);
+  }
 
   addSep('— VOTAZIONE —');
   addSystemMsg('Il villaggio vota chi bandire.');
@@ -1640,12 +1827,23 @@ async function runDay(nightResult) {
     if (!isRunning) return;
     await waitIfPaused();
     const candidates = aliveFinal.filter(p=>p.name!==voter.name);
-    showThinking(voter);
-    setStatus(`${voter.name} vota...`);
-    const choice = await ask(voter, `Vota per eliminare uno tra: ${candidates.map(p=>p.name).join(', ')}. Basa il tuo voto sulla discussione.${voteSummary} Rispondi SOLO con il nome esatto.`, candidates);
-    removeThinking();
+
+    let choice;
+    if (voter.isHuman) {
+      const choiceStr = await waitForPlayerChoice(
+        `🗳️ Vota chi vuoi eliminare`,
+        candidates.map(p=>p.name)
+      );
+      choice = choiceStr;
+      addMsg(voter, `Voto per eliminare ${choice}.`, 'vote');
+    } else {
+      showThinking(voter);
+      setStatus(`${voter.name} vota...`);
+      choice = await ask(voter, `È il momento del voto. Basandoti sulla discussione, dichiara in una frase chi vuoi eliminare e perché, poi indica il nome esatto.${voter.role==='wolf'?' Giustifica il tuo voto con argomenti da cittadino innocente — non rivelare mai la tua vera natura o i tuoi veri obiettivi.':voter.role==='jester'?' Ricorda il tuo obiettivo: devi farti eliminare tu, non votare strategicamente per il villaggio.':''}${voteSummary}`, candidates);
+      removeThinking();
+      addMsg(voter, choice, 'vote');
+    }
     if (votes[choice]!==undefined) votes[choice]++;
-    addMsg(voter, `Voto per eliminare ${choice}.`, 'vote');
     await sleep(getDelay()*1.0);
   }
 
@@ -1681,7 +1879,7 @@ async function runDay(nightResult) {
 }
 
 function stopGame() {
-  if (!isRunning) return;
+  if (!isRunning && !game) return;
   isRunning = false;
   isPaused = false;
   if (pauseResolve) { pauseResolve(); pauseResolve = null; }
@@ -1689,9 +1887,25 @@ function stopGame() {
   document.getElementById('start-btn').disabled = false;
   document.getElementById('start-btn').textContent = 'Nuova Partita';
   document.getElementById('advance-btn').style.display = 'none';
-  addSystemMsg('⏹ Partita interrotta dal narratore.');
-  setPhase('interrotta');
-  updatePlayersList();
+  document.getElementById('player-input-area')?.remove();
+
+  // Rivela tutti i ruoli
+  if (game) {
+    const rmap = {wolf:'🐺 Lupo',seer:'🔮 Veggente',healer:'💚 Guaritore',sheriff:'🔫 Sceriffo',jester:'🃏 Matto',villager:'👤 Villager'};
+    const reveal = game.players.map(p=>`${p.emoji} ${p.name} — ${rmap[p.role]}${p.dead?' (eliminato)':''}`).join('\n');
+    addSystemMsg(`⏹ Partita terminata dal narratore.\n\n📋 Ruoli rivelati:\n${reveal}`);
+    game.gameOver = true;
+    updatePlayersList();
+  }
+
+  // Azzera la chat dopo 3 secondi per dare tempo di leggere i ruoli
+  setTimeout(() => {
+    document.getElementById('chat-log').innerHTML = '';
+    document.getElementById('events-log').innerHTML = '';
+    setPhase('in attesa');
+    setStatus('Premi "Nuova Partita" per ricominciare');
+    game = null;
+  }, 3000);
 }
 
 function showWin(winner) {
@@ -1755,9 +1969,12 @@ function startGame() {
   document.getElementById('pause-btn').textContent='⏸ Pausa';
   document.getElementById('pause-btn').classList.remove('paused');
 
-  const n=parseInt(document.getElementById('num-players-select').value);
+  const playerMode = document.getElementById('player-mode')?.checked;
+  const n = parseInt(document.getElementById('num-players-select').value);
+  const aiCount = playerMode ? n - 1 : n;
+
   game = {
-    players: PLAYER_SLOTS.slice(0,n).map((slot,i)=>{
+    players: PLAYER_SLOTS.slice(0, aiCount).map((slot,i)=>{
       const a=getAssignment(i)||opts[i%opts.length];
       const provider=PROVIDERS.find(p=>p.id===a.providerId);
       const modelObj=provider?.models.find(m=>m.id===a.modelId);
@@ -1770,11 +1987,28 @@ function startGame() {
         providerId: a.providerId,
         modelId: a.modelId,
         bg: BG_COLORS[i%BG_COLORS.length],
-        dead: false, role: null, seenPlayers: [],
+        dead: false, role: null, seenPlayers: [], isHuman: false,
       };
     }),
     night:0, phase:'setup', deathLog:[], gameOver:false, dayHistory:[],
+    humanPlayer: null,
   };
+
+  // Aggiungi il giocatore umano se in modalità player
+  if (playerMode) {
+    const humanSlot = {
+      emoji: '🧑',
+      name: 'Tu',
+      providerLabel: 'Giocatore umano',
+      providerId: null,
+      modelId: null,
+      bg: '#fef3c7',
+      dead: false, role: null, seenPlayers: [], isHuman: true,
+      personality: 'giocatore umano'
+    };
+    game.players.push(humanSlot);
+    game.humanPlayer = humanSlot;
+  }
 
   assignRoles(game.players);
   updatePlayersList(); updateStats();
