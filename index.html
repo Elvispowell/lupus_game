@@ -1329,6 +1329,7 @@ function buildHistoryCtx(player) {
 }
 
 async function ask(player, prompt, candidates=null) {
+  if (player.isHuman) return ''; // il giocatore umano è gestito separatamente
   try {
     await waitIfPaused();
     const reply = await callProvider(player, buildSysPrompt(player), prompt);
@@ -1586,32 +1587,36 @@ async function runNight() {
   const human = game.humanPlayer;
   if (human && !human.dead) {
     if (human.role === 'wolf') {
-      // Mostra i messaggi dei compagni lupi come segreti
+      // Mostra i messaggi dei compagni lupi
       const wolfAllies = game.players.filter(p=>p.role==='wolf'&&!p.dead&&!p.isHuman);
       if (wolfAllies.length) {
-        addNarratorSecret(`🐺 I tuoi compagni lupi: <strong>${wolfAllies.map(p=>p.name).join(', ')}</strong>`);
+        addHumanSecret(`🐺 I tuoi compagni lupi: <strong>${wolfAllies.map(p=>p.name).join(', ')}</strong>`);
+        // Mostra cosa hanno detto i lupi AI stanotte
+        wolfAllies.forEach(ally => {
+          if (ally.nightStatement) addHumanSecret(`🐺 ${ally.name} ha detto: "${ally.nightStatement}"`);
+        });
       }
-      // L'umano decide chi eliminare (sovrascrive la scelta AI)
+      // Annulla la scelta dei lupi AI e lascia decidere l'umano
+      if (killed_name) {
+        const prevVictim = game.players.find(p=>p.name===killed_name);
+        if (prevVictim) { prevVictim.dead = false; }
+        killed_name = null;
+      }
       const nonWolvesNow2 = game.players.filter(p=>!p.dead&&p.role!=='wolf');
       if (nonWolvesNow2.length) {
         const choiceStr = await waitForPlayerChoice(
           `🐺 Sei il LUPO — scegli chi eliminare stanotte`,
           nonWolvesNow2.map(p=>p.name)
         );
-        // Annulla eventuale vittima già scelta dalle AI e usa quella umana
-        if (killed_name) {
-          const prevVictim = game.players.find(p=>p.name===killed_name);
-          if (prevVictim) prevVictim.dead = false; // ripristina
-        }
         const newVictim = game.players.find(p=>p.name===choiceStr);
         if (newVictim && newVictim.name !== protected_name) {
           newVictim.dead = true;
           killed_name = newVictim.name;
           game.deathLog.push(`${newVictim.name} ucciso dai lupi (notte ${game.night})`);
-          addNarratorSecret(`🐺 Hai scelto di eliminare: <strong>${newVictim.name}</strong>`);
+          addHumanSecret(`🐺 Hai scelto di eliminare: <strong>${newVictim.name}</strong>`);
         } else if (newVictim && newVictim.name === protected_name) {
           killed_name = null;
-          addNarratorSecret(`🐺 Hai scelto ${choiceStr} ma il Guaritore lo proteggeva — ✅ SALVATO!`);
+          addHumanSecret(`🐺 Hai scelto ${choiceStr} ma il Guaritore lo proteggeva — ✅ SALVATO!`);
         }
       }
     } else if (human.role === 'seer') {
@@ -1664,7 +1669,28 @@ async function runNight() {
   return { killed: killed_name, sheriffKilled: sheriff_killed };
 }
 
+function addHumanSecret(html) {
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:0.3rem 0;padding:0.5rem 0.75rem;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#92400e;font-family:var(--font-mono,monospace);';
+  wrap.innerHTML = `<span style="opacity:0.6;font-size:0.65rem">👤 solo tu vedi questo · </span>${html}`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+function revealHumanRole() {
+  if (!game?.humanPlayer) return;
+  const human = game.humanPlayer;
+  const rmap = {wolf:'🐺 LUPO MANNARO',seer:'🔮 VEGGENTE',healer:'💚 GUARITORE',sheriff:'🔫 SCERIFFO',jester:'🃏 MATTO',villager:'👤 VILLAGER'};
+  const allies = human.role==='wolf'
+    ? game.players.filter(p=>p.role==='wolf'&&!p.isHuman).map(p=>p.name)
+    : [];
+  const allyCtx = allies.length ? ` I tuoi complici lupi: <strong>${allies.join(', ')}</strong>` : '';
+  addHumanSecret(`🎭 Il tuo ruolo segreto: <strong>${rmap[human.role]}</strong>${allyCtx}`);
+}
+
 function addNarratorSecret(html) {
+  if (game?.humanPlayer && isPlayerMode()) return;
   const log = document.getElementById('chat-log');
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:0.3rem 0;padding:0.5rem 0.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#713f12;font-family:var(--font-mono,monospace);';
@@ -1784,14 +1810,23 @@ Parla direttamente in personaggio — non analizzare la situazione ad alta voce,
         await waitIfPaused();
         await sleep(getDelay()*0.5);
 
-        showThinking(accused);
-        setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
-        const replyCtx = `${p.name} ha appena parlato di te nel suo intervento: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi, ma la tua risposta non dà diritto ad ulteriori repliche.${historyCtx}\n\n${commonStrategies}`;
-        const replyMsg = await ask(accused, replyCtx);
-        removeThinking();
-        addMsg(accused, replyMsg, 'day');
-        discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
-        await sleep(getDelay()*0.8);
+        if (accused.isHuman) {
+          // L'umano può rispondere manualmente
+          const replyMsg = await waitForPlayerInput(`💬 ${p.name} ha parlato di te — vuoi replicare?`);
+          if (replyMsg.trim()) {
+            addMsg(accused, replyMsg, 'day');
+            discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
+          }
+        } else {
+          showThinking(accused);
+          setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
+          const replyCtx = `${p.name} ha appena parlato di te nel suo intervento: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi, ma la tua risposta non dà diritto ad ulteriori repliche.${historyCtx}`;
+          const replyMsg = await ask(accused, replyCtx);
+          removeThinking();
+          addMsg(accused, replyMsg, 'day');
+          discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
+          await sleep(getDelay()*0.8);
+        }
       }
       // ─────────────────────────────────────────────────
 
@@ -2011,6 +2046,7 @@ function startGame() {
   }
 
   assignRoles(game.players);
+  if (playerMode) revealHumanRole();
   updatePlayersList(); updateStats();
   updateNarratorTargets(); updateSuggestions();
   isRunning=true;
