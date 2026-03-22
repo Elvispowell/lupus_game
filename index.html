@@ -636,16 +636,13 @@ const PROVIDERS = [
       { id: 'qwen/qwq-32b',                               label: 'QwQ 32B' },
       { id: 'qwen/qwen3-5-122b-a10b',                     label: 'Qwen 3.5 122B ⚠️' },
       { id: 'igenius/italia_10b_instruct_16k',            label: 'Italia 10B 🇮🇹' },
-      { id: 'stepfun-ai/step-3-5-flash',                  label: 'Step 3.5 Flash' },
       { id: 'marin/marin-8b-instruct',                    label: 'Marin 8B' },
       { id: 'tiiuae/falcon3-7b-instruct',                 label: 'Falcon 3 7B' },
-      { id: 'aisingapore/sea-lion-7b-instruct',           label: 'SEA-Lion 7B' },
       { id: 'rakuten/rakutenai-7b-instruct',              label: 'RakutenAI 7B' },
       { id: 'mediatek/breeze-7b-instruct',                label: 'Breeze 7B' },
       { id: 'upstage/solar-10.7b-instruct',               label: 'Solar 10.7B' },
       { id: 'baichuan-inc/baichuan2-13b-chat',            label: 'Baichuan2 13B' },
       { id: 'bytedance/seed-oss-36b-instruct',            label: 'Seed OSS 36B' },
-      { id: 'stepfun-ai/step-3-5-flash',                  label: 'Step 3.5 Flash' },
       { id: 'minimaxai/minimax-m2.1',                     label: 'MiniMax M2.1' },
       { id: 'mistralai/devstral-2-123b-instruct-2512',    label: 'Devstral 2 123B' },
       { id: 'baichuan-inc/baichuan2-13b-chat',            label: 'Baichuan2 13B' },
@@ -826,7 +823,6 @@ const PROVIDERS = [
     models: [
       { id: 'arcee-ai/trinity-large-preview', label: 'Trinity Large Preview' },
       { id: 'arcee-ai/trinity-mini',          label: 'Trinity Mini' },
-      { id: 'arcee-ai/trinity-nano',          label: 'Trinity Nano' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('https://models.arcee.ai/v1/chat/completions', {
@@ -997,16 +993,12 @@ const MODEL_CHAIN = {
   'nemotron-nano-12b-v2': ['openrouter:nvidia/nemotron-nano-12b-v2-vl:free'],
   // Italia 10B
   'italia-10b': ['nvidia:igenius/italia_10b_instruct_16k'],
-  // Step 3.5 Flash
-  'step-3.5-flash': ['nvidia:stepfun-ai/step-3-5-flash','openrouter:stepfun-ai/step-3-5-flash:free'],
   // Marin 8B
   'marin-8b': ['nvidia:marin/marin-8b-instruct'],
   // Falcon 3 7B
   'falcon-3-7b': ['nvidia:tiiuae/falcon3-7b-instruct'],
   // Falcon 7B
   'falcon-7b': ['huggingface:tiiuae/falcon-7b-instruct'],
-  // SEA-Lion 7B
-  'sea-lion-7b': ['nvidia:aisingapore/sea-lion-7b-instruct'],
   // RakutenAI 7B
   'rakutenai-7b': ['nvidia:rakuten/rakutenai-7b-instruct'],
   // Breeze 7B
@@ -1029,8 +1021,6 @@ const MODEL_CHAIN = {
   'trinity-large': ['arcee:arcee-ai/trinity-large-preview', 'openrouter:arcee-ai/trinity-large-preview:free'],
   // Trinity Mini
   'trinity-mini': ['arcee:arcee-ai/trinity-mini', 'openrouter:arcee-ai/trinity-mini:free'],
-  // Trinity Nano
-  'trinity-nano': ['arcee:arcee-ai/trinity-nano'],
   // Qwen3 Next 80B
   'qwen3-next-80b': ['openrouter:qwen/qwen3-next-80b-a3b-instruct:free'],
 };
@@ -1072,7 +1062,7 @@ function toggleSetup(btn) {
 }
 
 let testRunning = false;
-let testLastIndex = 70; // riparte da QwQ 32B
+let testLastIndex = 0;
 let testResults = {};
 
 function stopModelTest() {
