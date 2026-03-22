@@ -256,6 +256,12 @@
       </div>
       <span style="font-size:0.62rem;color:var(--text-faint);font-family:var(--font-mono,monospace)">il resto sarà villager</span>
     </div>
+    <div style="margin-top:0.9rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+      <button id="test-btn" onclick="testAllModels()" style="font-family:'DM Sans',sans-serif;font-size:0.7rem;padding:0.3rem 0.9rem;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface2);color:var(--text-muted);cursor:pointer;font-weight:500">🧪 Testa tutti i modelli</button>
+      <button id="test-stop-btn" onclick="stopModelTest()" style="display:none;font-family:'DM Sans',sans-serif;font-size:0.7rem;padding:0.3rem 0.9rem;border:1px solid #991b1b;border-radius:6px;background:#fef2f2;color:#991b1b;cursor:pointer;font-weight:500">⏹ Ferma test</button>
+      <span id="test-status" style="font-size:0.65rem;color:var(--text-faint);font-family:'DM Mono',monospace"></span>
+    </div>
+    <div id="test-results" style="display:none;margin-top:0.75rem;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0.5rem;background:var(--surface)"></div>
   </div>
 </div>
 
@@ -782,16 +788,17 @@ const PROVIDERS = [
       { id: 'glm-4-32b-0414',   label: 'GLM-4 32B' },
     ],
     call: async (key, model, sys, usr) => {
-      const r = await fetch('https://api.z.ai/api/paas/v4/chat/completions', {
+      const r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
         body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
           messages:[{role:'system',content:sys},{role:'user',content:usr}] })
       });
-      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||e?.message||`HTTP ${r.status}`); }
       const d = await r.json();
-      const t = d?.choices?.[0]?.message?.content;
+      const msg = d?.choices?.[0]?.message;
+      const t = msg?.content || msg?.reasoning_content || d?.choices?.[0]?.text;
       if (!t) throw new Error('Risposta vuota');
-      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').replace(/<\|thinking\|>[\s\S]*?<\|\/thinking\|>/gi,'').trim();
     }
   },
   {
@@ -1139,6 +1146,109 @@ const keys = {};
 function toggleSetup(btn) {
   btn.classList.toggle('open');
   document.getElementById('setup-body').classList.toggle('open');
+}
+
+let testRunning = false;
+
+function stopModelTest() {
+  testRunning = false;
+  document.getElementById('test-stop-btn').style.display = 'none';
+  document.getElementById('test-btn').disabled = false;
+  document.getElementById('test-status').textContent = 'Test interrotto.';
+}
+
+async function testAllModels() {
+  if (testRunning) return;
+  testRunning = true;
+  const btn = document.getElementById('test-btn');
+  const stopBtn = document.getElementById('test-stop-btn');
+  const statusEl = document.getElementById('test-status');
+  const resultsEl = document.getElementById('test-results');
+
+  btn.disabled = true;
+  stopBtn.style.display = 'inline-block';
+  resultsEl.style.display = 'block';
+  resultsEl.innerHTML = '';
+
+  const allModels = buildUnifiedModels();
+  let ok = 0, fail = 0, skip = 0;
+
+  for (let i = 0; i < allModels.length; i++) {
+    if (!testRunning) break;
+    const m = allModels[i];
+
+    const hasProvider = m.chain.some(entry => {
+      const pid = entry.split(':')[0];
+      const p = PROVIDERS.find(x=>x.id===pid);
+      return p && (p.serverSide || keys[pid]);
+    });
+
+    if (!hasProvider) {
+      skip++;
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:0.2rem 0.4rem;font-size:0.65rem;font-family:var(--font-mono,monospace);color:var(--text-faint)';
+      row.textContent = `⬜ ${m.label} — nessuna key`;
+      resultsEl.appendChild(row);
+      resultsEl.scrollTop = resultsEl.scrollHeight;
+      continue;
+    }
+
+    statusEl.textContent = `Testing ${i+1}/${allModels.length}: ${m.label}...`;
+
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:0.2rem 0.4rem;font-size:0.65rem;font-family:var(--font-mono,monospace)';
+    row.textContent = `⏳ ${m.label}`;
+    resultsEl.appendChild(row);
+    resultsEl.scrollTop = resultsEl.scrollHeight;
+
+    let success = false;
+    let lastError = '';
+
+    for (const entry of m.chain) {
+      if (!testRunning) break;
+      const colonIdx = entry.indexOf(':');
+      const pid = entry.slice(0, colonIdx);
+      const mid = entry.slice(colonIdx + 1);
+      const provider = PROVIDERS.find(p=>p.id===pid);
+      if (!provider) continue;
+      if (!provider.serverSide && !keys[pid]) continue;
+
+      const key = provider.serverSide ? '' : keys[pid].replace(/[^\x20-\x7E]/g,'').trim();
+      try {
+        const result = await provider.call(key, mid, 'Sei un assistente.', 'Rispondi con una sola parola: ok');
+        if (result && result.trim().length > 0) {
+          success = true;
+          row.style.color = '#16a34a';
+          row.textContent = `✅ ${m.label} — ${provider.name}`;
+          ok++;
+          break;
+        }
+      } catch(e) {
+        lastError = e.message;
+        if (e.message.includes('429') || e.message.toLowerCase().includes('rate')) {
+          row.style.color = '#d97706';
+          row.textContent = `⚠️ ${m.label} — rate limit (${provider.name})`;
+          skip++;
+          success = true;
+          break;
+        }
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (!success) {
+      row.style.color = '#dc2626';
+      row.textContent = `❌ ${m.label} — ${lastError.slice(0,60)}`;
+      fail++;
+    }
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  testRunning = false;
+  stopBtn.style.display = 'none';
+  btn.disabled = false;
+  statusEl.textContent = `✅ ${ok} ok · ❌ ${fail} falliti · ⬜ ${skip} saltati`;
 }
 
 function saveKeysToStorage() {
