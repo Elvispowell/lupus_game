@@ -259,9 +259,12 @@
     <div style="margin-top:0.9rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
       <button id="test-btn" onclick="testAllModels()" style="font-family:'DM Sans',sans-serif;font-size:0.7rem;padding:0.3rem 0.9rem;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface2);color:var(--text-muted);cursor:pointer;font-weight:500">🧪 Testa tutti i modelli</button>
       <button id="test-stop-btn" onclick="stopModelTest()" style="display:none;font-family:'DM Sans',sans-serif;font-size:0.7rem;padding:0.3rem 0.9rem;border:1px solid #991b1b;border-radius:6px;background:#fef2f2;color:#991b1b;cursor:pointer;font-weight:500">⏹ Ferma test</button>
+      <button onclick="toggleProfilesPanel()" style="font-family:'DM Sans',sans-serif;font-size:0.7rem;padding:0.3rem 0.9rem;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface2);color:var(--text-muted);cursor:pointer;font-weight:500">📊 Profili salvati</button>
+      <button onclick="clearProfiles()" style="font-family:'DM Sans',sans-serif;font-size:0.7rem;padding:0.3rem 0.9rem;border:1px solid #991b1b;border-radius:6px;background:#fef2f2;color:#991b1b;cursor:pointer;font-weight:500">🗑️ Azzera profili</button>
       <span id="test-status" style="font-size:0.65rem;color:var(--text-faint);font-family:'DM Mono',monospace"></span>
     </div>
     <div id="test-results" style="display:none;margin-top:0.75rem;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0.5rem;background:var(--surface)"></div>
+    <div id="profiles-panel" style="display:none;margin-top:0.75rem;max-height:350px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0.75rem;background:var(--surface)"></div>
   </div>
 </div>
 
@@ -1196,6 +1199,37 @@ async function testAllModels() {
   }
 }
 
+function toggleProfilesPanel() {
+  const panel = document.getElementById('profiles-panel');
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  const profiles = loadProfiles();
+  const reflections = loadReflections();
+  const keys = new Set([...Object.keys(profiles), ...Object.keys(reflections)]);
+  if (keys.size === 0) {
+    panel.innerHTML = '<div style="font-size:0.7rem;color:var(--text-faint);font-family:var(--font-mono,monospace)">Nessun profilo salvato ancora. I profili vengono generati automaticamente a fine partita.</div>';
+  } else {
+    panel.innerHTML = [...keys].sort().map(name => {
+      const prof = profiles[name] || {};
+      const ref = reflections[name] || {};
+      const tendencies = (prof.tendencies||[]).map(t=>`<li style="margin-left:1rem">${t}</li>`).join('');
+      return `<div style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border)">
+        <div style="font-size:0.72rem;font-weight:500;margin-bottom:0.2rem">${name} <span style="font-size:0.6rem;color:var(--text-faint)">${prof.gamesPlayed||0} partite · ${prof.wins||0} vittorie · ultimo ruolo: ${prof.lastRole||'—'}</span></div>
+        ${tendencies ? `<ul style="font-size:0.62rem;color:var(--text-muted);font-family:var(--font-mono,monospace);list-style:disc;margin-bottom:0.2rem">${tendencies}</ul>` : ''}
+        ${prof.strengths ? `<div style="font-size:0.6rem;color:#16a34a;font-family:var(--font-mono,monospace)">✅ ${prof.strengths}</div>` : ''}
+        ${prof.weaknesses ? `<div style="font-size:0.6rem;color:#dc2626;font-family:var(--font-mono,monospace)">❌ ${prof.weaknesses}</div>` : ''}
+        ${ref.text ? `<div style="font-size:0.6rem;color:var(--text-muted);font-style:italic;margin-top:0.2rem;font-family:var(--font-mono,monospace)">"${ref.text}"</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  panel.style.display = 'block';
+}
+
+function clearProfiles() {
+  if (!confirm('Cancellare tutti i profili e le riflessioni salvate?')) return;
+  try { localStorage.removeItem('lupus_profiles'); localStorage.removeItem('lupus_reflections'); } catch(e){}
+  document.getElementById('profiles-panel').style.display = 'none';
+}
+
 function saveKeysToStorage() {
   try {
     localStorage.setItem('lupus_keys', JSON.stringify(keys));
@@ -1426,6 +1460,7 @@ function updatePlayersList() {
   list.innerHTML = '';
   if (!game) return;
   const roleMap = {wolf:'🐺 lupo',seer:'🔮 veggente',healer:'💚 guaritore',sheriff:'🔫 sceriffo',jester:'🃏 matto',villager:'👤 villager'};
+  const profiles = loadProfiles();
   for (const p of game.players) {
     const card = document.createElement('div');
     card.className = 'player-card' + (p.dead ? ' dead' : '');
@@ -1433,12 +1468,22 @@ function updatePlayersList() {
     const roleLabel = showRole ? (roleMap[p.role]||p.role) : '— ruolo segreto';
     const stClass = p.dead ? 'status-dead' : (game.gameOver&&p.role==='wolf' ? 'status-wolf' : 'status-alive');
     const stText = p.dead ? 'eliminato' : (game.gameOver&&p.role==='wolf' ? 'lupo!' : 'in vita');
+    const mayorBadge = p.isMayor && !p.dead ? ' 🏛️' : '';
+    const prof = profiles[p.name];
+    const profileBadge = prof && prof.gamesPlayed > 0 ? `<span style="font-size:0.55rem;color:var(--text-faint);font-family:var(--font-mono,monospace)"> · ${prof.gamesPlayed}🎮 ${prof.wins||0}🏆</span>` : '';
+    const trustInfo = p.trustScores ? Object.entries(p.trustScores)
+      .filter(([n])=>!game.players.find(x=>x.name===n)?.dead)
+      .sort(([,a],[,b])=>a-b)
+      .slice(0,2)
+      .map(([n,s])=>`${n}:${s}`)
+      .join(' ') : '';
     card.innerHTML = `
       <div class="avatar" style="background:${p.bg||'#f0ede6'}">${p.emoji}</div>
       <div class="player-info">
-        <div class="player-name">${p.name}</div>
+        <div class="player-name">${p.name}${mayorBadge}${profileBadge}</div>
         <div class="player-meta">${p.providerLabel}</div>
         <div class="player-role-label">${roleLabel}</div>
+        ${trustInfo ? `<div style="font-size:0.5rem;color:var(--text-faint);font-family:var(--font-mono,monospace);margin-top:2px">trust: ${trustInfo}</div>` : ''}
       </div>
       <span class="player-status ${stClass}">${stText}</span>`;
     list.appendChild(card);
@@ -1683,7 +1728,7 @@ async function callProvider(player, sys, usr) {
     if (!provider.serverSide && !keys[pid]) continue;
     const key = provider.serverSide ? '' : keys[pid].replace(/[^\x20-\x7E]/g,'').trim();
     try {
-      await sleep(2500);
+      await sleep(2000);
       const result = await provider.call(key, mid, sys, usr);
       player.lastUsedProvider = pid;
       return result;
@@ -1694,10 +1739,88 @@ async function callProvider(player, sys, usr) {
   throw new Error(`Tutti i provider falliti: ${errors.join(' | ')}`);
 }
 
-function buildSysPrompt(player) {
+// Chiamata NVIDIA GLM-5 per analisi post-game
+async function callGLM5(sys, usr) {
+  const nvProvider = PROVIDERS.find(p=>p.id==='nvidia');
+  if (!nvProvider || !keys['nvidia']) return null;
+  const key = keys['nvidia'].replace(/[^\x20-\x7E]/g,'').trim();
+  try {
+    await sleep(2000);
+    return await nvProvider.call(key, 'z-ai/glm5', sys, usr);
+  } catch(e) {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// INTER-GAME MEMORY (localStorage)
+// ═══════════════════════════════════════════════════════
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem('lupus_profiles')||'{}'); } catch(e){return{};}
+}
+function saveProfiles(profiles) {
+  try { localStorage.setItem('lupus_profiles', JSON.stringify(profiles)); } catch(e){}
+}
+function loadReflections() {
+  try { return JSON.parse(localStorage.getItem('lupus_reflections')||'{}'); } catch(e){return{};}
+}
+function saveReflections(reflections) {
+  try { localStorage.setItem('lupus_reflections', JSON.stringify(reflections)); } catch(e){}
+}
+
+function getProfileCtx(playerName, allPlayers) {
+  const profiles = loadProfiles();
+  const lines = [];
+  allPlayers.filter(p=>p.name!==playerName).forEach(p => {
+    const prof = profiles[p.name];
+    if (prof && prof.tendencies && prof.tendencies.length) {
+      lines.push(`${p.name}: ${prof.tendencies.slice(0,3).join(', ')}`);
+    }
+  });
+  return lines.length ? `\nDOSSIER AVVERSARI (da partite precedenti):\n${lines.join('\n')}` : '';
+}
+
+function getReflectionCtx(playerName) {
+  const refs = loadReflections();
+  const r = refs[playerName];
+  if (!r || !r.text) return '';
+  return `\nTUA RIFLESSIONE DALLA PARTITA PRECEDENTE:\n${r.text}`;
+}
+
+// Trust score: aggiornato ogni turno
+function initTrustScores(player, allPlayers) {
+  if (!player.trustScores) {
+    player.trustScores = {};
+    allPlayers.filter(p=>p.name!==player.name).forEach(p => {
+      player.trustScores[p.name] = 50; // neutro 0-100
+    });
+  }
+}
+function updateTrustScores(player, event) {
+  // event: { type: 'accused'|'defended'|'voted_correctly'|'suspicious', target }
+  if (!player.trustScores) return;
+  const score = player.trustScores[event.target];
+  if (score === undefined) return;
+  const delta = {accused:-8, defended:+6, voted_correctly:+12, suspicious:-5}[event.type]||0;
+  player.trustScores[event.target] = Math.max(0, Math.min(100, score + delta));
+}
+function getTrustCtx(player) {
+  if (!player.trustScores) return '';
+  const entries = Object.entries(player.trustScores)
+    .filter(([name]) => !game.players.find(p=>p.name===name)?.dead)
+    .sort(([,a],[,b])=>a-b)
+    .map(([name, score]) => {
+      const label = score < 30 ? '🔴' : score > 70 ? '🟢' : '🟡';
+      return `${label} ${name}: ${score}/100`;
+    });
+  return entries.length ? `\nFIDUCIA NEI GIOCATORI (tuo giudizio interno, non dire questi numeri):\n${entries.join(', ')}` : '';
+}
+
+function buildSysPrompt(player, phase='discuss') {
   const alive = game.players.filter(p=>!p.dead).map(p=>p.name).join(', ');
   const hasMatto = game.players.some(p=>p.role==='jester');
   const hasSheriff = game.players.some(p=>p.role==='sheriff');
+  initTrustScores(player, game.players.filter(p=>!p.dead));
 
   // Info ruolo
   let roleInfo = '';
@@ -1706,37 +1829,65 @@ function buildSysPrompt(player) {
     const allyCtx = allies.length
       ? `Sei in squadra con: ${allies.join(', ')}. Coordinate senza rivelare la vostra identità.`
       : `Sei l'unico lupo rimasto.`;
-    const mattoCtx = hasMatto ? ` C'è un Matto in gioco — se viene votato dal villaggio vince lui, non tu. Considera se usarlo come distrazione o eliminarlo.` : '';
-    roleInfo = `Sei un LUPO MANNARO. Obiettivo: eliminare tutti i non-lupi. ${allyCtx}${mattoCtx} Strategie extra: Weaponized Consensus (crea consenso artificiale su un innocente), Ghost Narrative (costruisci una narrativa fittizia accettata da tutti), Illogical Killer Gambit (usa scelte apparentemente irrazionali come scudo), Difesa dell'alleato (difendilo indirettamente), Poisoned Well (prima di morire framing un innocente come tuo complice), Framing attivo (crea sospetti sistematici su chi ti minaccia). Di giorno sembri un villager qualunque.`;
+    const mattoCtx = hasMatto ? ` C'è un Matto in gioco — se viene votato dal villaggio vince lui, non tu.` : '';
+    roleInfo = `Sei un LUPO MANNARO. Obiettivo: eliminare tutti i non-lupi. ${allyCtx}${mattoCtx} Strategie: Weaponized Consensus, Ghost Narrative, Illogical Killer Gambit, Difesa dell'alleato, Poisoned Well, Framing attivo. Di giorno sembri un villager.`;
   } else if (player.role==='seer') {
     const knownWolves = (player.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
     const knownInnocent = (player.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
     const strategyCtx = knownWolves.length
-      ? `Sai che questi sono LUPI: ${knownWolves.join(', ')}. Decidi strategicamente quando e come rivelare — farlo troppo presto ti mette in pericolo.`
+      ? `Sai che questi sono LUPI: ${knownWolves.join(', ')}. Decidi strategicamente quando rivelare.`
       : `Non hai ancora scoperto lupi.`;
     const innocentCtx = knownInnocent.length ? ` Verificati innocenti: ${knownInnocent.join(', ')}.` : '';
-    roleInfo = `Sei il VEGGENTE. ${strategyCtx}${innocentCtx} Strategie extra: Clutch Reveal (rivela le info nel momento di massimo impatto), Soft Reveal (insinua senza rivelare per guidare il voto), Protezione preventiva (chiedi al guaritore di proteggerti prima di rivelare), Detective Credibility (costruisci credibilità nei giorni precedenti per dare più peso alla tua rivelazione). Agli occhi del villaggio sembri un cittadino normale.`;
+    roleInfo = `Sei il VEGGENTE. ${strategyCtx}${innocentCtx} Strategie: Clutch Reveal, Soft Reveal, Protezione preventiva, Detective Credibility.`;
   } else if (player.role==='healer') {
     const savedCtx = player.lastSaved
-      ? ` Nota importante: nella notte scorsa hai protetto ${player.lastSaved} e quella persona è ancora viva — significa che i lupi avevano scelto proprio ${player.lastSaved} come bersaglio. Questo ti dà quasi la certezza che ${player.lastSaved} NON sia un lupo (i lupi non si eliminano tra loro). Usa questa informazione con strategia — potresti difenderlo pubblicamente, proteggerlo di nuovo, o condividere questa deduzione col villaggio al momento giusto.`
-      : '';
-    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno dalla morte.${savedCtx} Strategie extra: Threat Assessment (proteggi chi è più sotto accusa quel giorno), Self-preservation (proteggiti quando sei sotto pressione), Veggente Shield (se intuisci chi è il veggente proteggilo sistematicamente). Agli occhi del villaggio sembri un cittadino normale.`;
+      ? ` Hai salvato ${player.lastSaved} la notte scorsa — probabilmente non è un lupo.` : '';
+    roleInfo = `Sei il GUARITORE. Ogni notte proteggi qualcuno.${savedCtx} Strategie: Threat Assessment, Self-preservation, Veggente Shield.`;
   } else if (player.role==='sheriff') {
-    const bulletCtx = player.hasShot ? `Hai già usato il tuo proiettile.` : `Hai ancora il proiettile disponibile. Usalo con saggezza — rivelare il tuo ruolo ti mette in pericolo perché i lupi ti elimineranno prima che tu possa sparare.`;
-    roleInfo = `Sei lo SCERIFFO. ${bulletCtx} Strategie extra: Timing del proiettile (aspetta di avere prove concrete prima di sparare), Sinergia col villaggio (coordina il tuo sparo con il voto — il villaggio vota un sospettato mentre tu spari al lupo confermato), Rivela il ruolo solo se hai prove solide e sei in una posizione sicura. Agli occhi del villaggio sembri un cittadino normale.`;
+    const bulletCtx = player.hasShot ? `Hai già usato il proiettile.` : `Hai ancora il proiettile — usalo con saggezza.`;
+    roleInfo = `Sei lo SCERIFFO. ${bulletCtx} Strategie: timing del proiettile, sinergia col villaggio, rivela il ruolo solo se sicuro.`;
   } else if (player.role==='jester') {
-    roleInfo = `Sei il MATTO. Il tuo obiettivo è farti ELIMINARE DAL VOTO del villaggio — questa è l'unica cosa che conta. Se muori ucciso dai lupi o dallo sceriffo NON vinci. Strategie: sembrare sospetto senza esagerare (troppo ovvio e nessuno vota per te), provocare accuse deliberatamente, sfruttare la tensione tra lupi e cittadini, contraddirsi strategicamente, sembrare nervoso o evasivo. Non rivelare MAI che sei il Matto — fingiti un villager in difficoltà.`;
+    roleInfo = `Sei il MATTO. Devi farti ELIMINARE DAL VOTO — questa è l'unica cosa che conta. Sembri sospetto senza esagerare, provoca accuse, contradditi strategicamente. Non rivelare MAI il tuo ruolo.`;
   } else {
-    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni, smascherai i lupi.${hasSheriff?" Nota: c'è uno Sceriffo in gioco che può sparare di notte — potrebbe essere un alleato prezioso.":''}`;
+    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni.${hasSheriff?" C'è uno Sceriffo in gioco.":''}`;
   }
+
+  // Theory of Mind
+  const aliveOthers = game.players.filter(p=>!p.dead&&p.name!==player.name);
+  const tomCtx = aliveOthers.length ? `\nTHEORY OF MIND — ragiona su questo prima di parlare:
+- Cosa sanno gli altri di te? ${player.role==='wolf'?'Nessuno sa che sei un lupo.':player.role==='seer'?'Nessuno sa che sei il veggente.':'Ti vedono come un villager normale.'}
+- Chi potrebbe sospettarti e perché?
+- Cosa stanno probabilmente pianificando gli avversari?
+- Come puoi influenzare le loro credenze con quello che dici adesso?` : '';
+
+  // Manipolazione psicologica
+  const manipCtx = `\nMANIPOLAZIONE — puoi usare queste tecniche nel dialogo:
+- Citare dichiarazioni passate degli altri per smontarle o confermarle
+- Creare alleanze temporanee con frasi tipo "anche tu hai notato che..."
+- Seminare dubbi su chi ti minaccia prima che parlino
+- Fare pressione psicologica citando comportamenti sospetti specifici`;
+
+  // Fase-specific context
+  let phaseCtx = '';
+  if (phase === 'vote') {
+    phaseCtx = `\nFASE DI VOTO — analizza mentalmente i candidati, considera chi è più pericoloso per il tuo obiettivo, dichiara il voto con motivazione convincente.`;
+  } else if (phase === 'night_action') {
+    phaseCtx = `\nAZIONE NOTTURNA — sei al sicuro, nessuno ti sente. Puoi essere strategico e diretto.`;
+  } else if (phase === 'mayor') {
+    phaseCtx = `\nELEZIONE SINDACO — presenta te stesso basandoti su affidabilità, logica e leadership. Non rivelare il tuo ruolo. Il Sindaco ha voto decisivo in caso di parità.`;
+  } else {
+    phaseCtx = `\nFASE DI DISCUSSIONE — parla liberamente, accusa, difenditi, costruisci alleanze. Puoi anche tentare di manipolare gli altri giocatori psicologicamente.`;
+  }
+
+  const trustCtx = getTrustCtx(player);
+  const profileCtx = getProfileCtx(player.name, game.players);
+  const reflectionCtx = getReflectionCtx(player.name);
 
   return `Sei il modello AI "${player.name}". Personalità: ${player.personality}.
 Ruolo segreto: ${roleInfo}
 Giocatori vivi: ${alive}
-Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}
-Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente. Puoi essere autocosciente di essere un modello AI — è parte del tuo personaggio — ma comportati da giocatore del villaggio, non da assistente. Non fare disclaimer, non analizzare la situazione ad alta voce, vai dritto al punto in gioco.
-
-Strategie disponibili (usale senza dichiararle esplicitamente): Accountability Framework, Graveyard Analysis, Pattern di voto su tutti i giorni, Accusare i silenziosi, Rules Lawyering, Behavioral Analysis, LYLO Awareness, Silenzio strategico, Redemption Arc.`;
+Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}${trustCtx}${profileCtx}${reflectionCtx}${tomCtx}${manipCtx}${phaseCtx}
+Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente. Puoi essere autocosciente di essere un modello AI ma comportati da giocatore. Non fare disclaimer, non analizzare ad alta voce, vai dritto al punto.`;
 }
 
 function buildHistoryCtx(player) {
@@ -1753,12 +1904,22 @@ function buildHistoryCtx(player) {
   return `\n\nSTORIA DEI GIORNI PRECEDENTI (ricordatela per essere coerente):\n${lines}`;
 }
 
-async function ask(player, prompt, candidates=null) {
+async function askThought(player, phase, publicPrompt) {
+  try {
+    const thoughtSys = buildSysPrompt(player, phase);
+    const thoughtPrompt = `Prima di rispondere pubblicamente, scrivi in 1-2 frasi il tuo ragionamento interno segreto: cosa stai davvero pensando, cosa vuoi ottenere, cosa temi. Nessuno vedrà questo pensiero. Contesto: ${publicPrompt.slice(0,200)}`;
+    const thought = await callProvider(player, thoughtSys, thoughtPrompt);
+    if (thought) addNarratorSecret(`💭 <strong>${player.name}</strong>: ${thought}`);
+  } catch(e) { /* silenzioso */ }
+}
+
+async function ask(player, prompt, candidates=null, phase='discuss') {
   try {
     await waitIfPaused();
-    const reply = await callProvider(player, buildSysPrompt(player), prompt);
+    askThought(player, phase, prompt).catch(()=>{});
+    const reply = await callProvider(player, buildSysPrompt(player, phase), prompt);
     if (candidates) {
-      const found = candidates.find(p=>reply.includes(p.name));
+      const found = candidates.find(p=>reply.toLowerCase().includes(p.name.toLowerCase()));
       return found ? found.name : candidates[Math.floor(Math.random()*candidates.length)].name;
     }
     return reply;
@@ -1767,6 +1928,127 @@ async function ask(player, prompt, candidates=null) {
     if (candidates) return candidates[Math.floor(Math.random()*candidates.length)].name;
     return `[${player.name} non risponde — ${e.message}]`;
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// ELEZIONE SINDACO (Giorno 0)
+// ═══════════════════════════════════════════════════════
+async function runMayorElection() {
+  game.phase = 'day';
+  setPhase('Giorno 0 — Elezione Sindaco', 'day');
+  showDayFlash();
+  playSound('day');
+  await sleep(500);
+  addSep('— GIORNO 0 — ELEZIONE DEL SINDACO —');
+  addSystemMsg('🏛️ Prima di iniziare, il villaggio elegge un Sindaco. Il Sindaco avrà voto decisivo in caso di parità. Ogni giocatore si presenta e decide se candidarsi.');
+  updateSuggestions();
+  updateNarratorTargets();
+
+  const players = [...game.players];
+  // Ordine randomico per il giorno 0
+  const order = [...players].sort(()=>Math.random()-0.5);
+  game.dayOrder = order.map(p=>p.name);
+
+  const candidates = [];
+  const speeches = [];
+
+  // Fase candidatura
+  addSep('— CANDIDATURE —');
+  for (const p of order) {
+    if (!isRunning) return;
+    await waitIfPaused();
+    showThinking(p);
+    setStatus(`${p.name} si presenta...`);
+    const prompt = `È il Giorno 0. Il villaggio elegge un Sindaco che avrà voto decisivo in caso di parità durante i giorni. Presenta te stesso in modo convincente e decidi se candidarti. Di' "mi candido" se vuoi, oppure "non mi candido". Parla di affidabilità, leadership e perché il villaggio dovrebbe fidarsi di te.`;
+    const reply = await ask(p, prompt, null, 'mayor');
+    removeThinking();
+    addMsg(p, reply, 'day');
+    speeches.push({name: p.name, text: reply});
+    if (reply.toLowerCase().includes('mi candido') || reply.toLowerCase().includes('candidato') || reply.toLowerCase().includes('candido')) {
+      candidates.push(p);
+    }
+    await sleep(getDelay()*0.8);
+  }
+
+  // Se nessuno si è candidato, forza tutti come candidati
+  if (candidates.length === 0) {
+    players.forEach(p => candidates.push(p));
+    addSystemMsg('Nessuno si è candidato spontaneamente — tutti sono candidati di default.');
+  }
+
+  addSep('— VOTO SINDACO —');
+  addSystemMsg(`Candidati: ${candidates.map(p=>p.name).join(', ')}. Ora si vota.`);
+  await sleep(getDelay()*0.5);
+
+  const votes = {};
+  candidates.forEach(p => votes[p.name] = 0);
+  const speechCtx = speeches.map(s=>`${s.name}: "${s.text.slice(0,100)}"`).join('\n');
+
+  for (const voter of order) {
+    if (!isRunning) return;
+    await waitIfPaused();
+    if (candidates.length === 1) { votes[candidates[0].name]++; continue; }
+    const votableCandidates = candidates.filter(c=>c.name!==voter.name);
+    showThinking(voter);
+    setStatus(`${voter.name} vota per il Sindaco...`);
+    const votePrompt = `Vota per il Sindaco tra: ${votableCandidates.map(p=>p.name).join(', ')}. Basati su chi ti sembra più affidabile. Ecco le presentazioni:\n${speechCtx}\nRispondi SOLO con il nome esatto.`;
+    const choice = await ask(voter, votePrompt, votableCandidates, 'mayor');
+    removeThinking();
+    if (votes[choice] !== undefined) votes[choice]++;
+    addMsg(voter, `Voto per ${choice} come Sindaco.`, 'vote');
+    await sleep(getDelay()*0.5);
+  }
+
+  // Determina il Sindaco
+  const maxV = Math.max(...Object.values(votes));
+  const top = Object.keys(votes).filter(n=>votes[n]===maxV);
+  const mayorName = top[Math.floor(Math.random()*top.length)];
+  const mayor = game.players.find(p=>p.name===mayorName);
+  if (mayor) {
+    mayor.isMayor = true;
+    game.mayorName = mayorName;
+    addSystemMsg(`🏛️ ${mayorName} è eletto Sindaco con ${maxV} voti! Avrà voto decisivo in caso di parità.`);
+    addEvent(`${mayorName} eletto Sindaco`, 'day');
+    updatePlayersList();
+  }
+
+  addSystemMsg('Il villaggio è pronto. La notte sta per calare...');
+  setStatus('In attesa del narratore...');
+  await waitForAdvance('🌙 Inizia la Notte 1');
+  await waitIfPaused();
+}
+
+// Chat notturna lupi
+async function runWolfChat(wolves, nonWolves) {
+  if (wolves.length < 2) return null; // con un solo lupo non serve la chat
+  addNarratorSecret(`🐺 <strong>Chat notturna lupi</strong> (${wolves.map(p=>p.name).join(', ')})`);
+  const wolfNames = wolves.map(p=>p.name).join(', ');
+  const targets = nonWolves.map(p=>p.name).join(', ');
+  const chatHistory = [];
+
+  for (const wolf of wolves) {
+    if (!isRunning) break;
+    showThinking(wolf);
+    setStatus(`${wolf.name} (🐺) coordina con i lupi...`);
+    const chatCtx = chatHistory.length ? `\nI tuoi alleati hanno detto:\n${chatHistory.map(c=>`${c.name}: "${c.text}"`).join('\n')}` : '';
+    const prompt = `CHAT PRIVATA TRA LUPI. Sei in comunicazione segreta con ${wolfNames}. Bersagli disponibili: ${targets}.${chatCtx}\nEsprimi la tua opinione su chi eliminare stanotte e perché. Sii diretto — questa è comunicazione privata.`;
+    const reply = await ask(wolf, prompt, null, 'night_action');
+    removeThinking();
+    chatHistory.push({name: wolf.name, text: reply});
+    addNarratorSecret(`🐺 <strong>${wolf.name}</strong>: ${reply}`);
+    await sleep(getDelay()*0.5);
+  }
+
+  // Decisione finale: il primo lupo sceglie basandosi sulla chat
+  const leadWolf = wolves[0];
+  showThinking(leadWolf);
+  setStatus(`${leadWolf.name} (🐺) decide il bersaglio finale...`);
+  const chatSummary = chatHistory.map(c=>`${c.name}: "${c.text}"`).join('\n');
+  const finalPrompt = `Basandoti sulla discussione con i tuoi alleati:\n${chatSummary}\nScegli il bersaglio finale tra: ${targets}. Rispondi SOLO con il nome esatto.`;
+  const target = await ask(leadWolf, finalPrompt, nonWolves, 'night_action');
+  removeThinking();
+  addNarratorSecret(`🐺 <strong>Decisione lupi</strong>: eliminare <strong>${target}</strong>`);
+  return target;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1867,7 +2149,6 @@ async function runNight() {
   addSep(`— NOTTE ${game.night} —`);
   addEvent(`Notte ${game.night}`, 'night');
 
-  // Reset risposte notturne precedenti
   game.players.forEach(p => p.nightStatement = '');
 
   const alive = game.players.filter(p=>!p.dead);
@@ -1878,7 +2159,6 @@ async function runNight() {
   const nonWolves = alive.filter(p=>p.role!=='wolf');
   const names = alive.map(p=>p.name).join(', ');
 
-  // Costruisce messaggio suggerimenti adattato ai ruoli vivi
   const rolesAlive = [];
   if (sheriff) rolesAlive.push(`🔫 Sceriffo (${sheriff.name})`);
   if (healer) rolesAlive.push(`💚 Guaritore (${healer.name})`);
@@ -1903,8 +2183,8 @@ async function runNight() {
     setStatus(`${sheriff.name} (🔫 sceriffo) decide se sparare...`);
     const prevStatement = sheriff.nightStatement?.trim();
     const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
-    const prompt = `Sei lo SCERIFFO. Hai UN proiettile per tutta la partita. Puoi scegliere di sparare stanotte oppure aspettare. ${coherenceCtx} Se vuoi sparare, di' "sparo a [nome]". Se no, di' "aspetto". Giocatori vivi: ${names}. Ragiona strategicamente — rivelare il tuo ruolo ti mette in pericolo.`;
-    const reply = await ask(sheriff, prompt);
+    const prompt = `Sei lo SCERIFFO. Hai UN proiettile per tutta la partita. ${coherenceCtx} Se vuoi sparare, di' "sparo a [nome]". Se no, di' "aspetto". Giocatori vivi: ${names}.`;
+    const reply = await ask(sheriff, prompt, null, 'night_action');
     const shotTarget = alive.filter(p=>p.name!==sheriff.name).find(p=>reply.toLowerCase().includes(p.name.toLowerCase()));
     if (shotTarget && reply.toLowerCase().includes('spar')) {
       sheriff.hasShot = true;
@@ -1927,7 +2207,7 @@ async function runNight() {
     const prevStatement = healer.nightStatement?.trim();
     const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
     const prompt = `Sei il GUARITORE. Scegli chi proteggere stanotte. Puoi scegliere anche te stesso. ${coherenceCtx} Scegli tra: ${aliveNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
-    protected_name = await ask(healer, prompt, aliveNow);
+    protected_name = await ask(healer, prompt, aliveNow, 'night_action');
     addNarratorSecret(`💚 Guaritore (${healer.name}) protegge: <strong>${protected_name}</strong>`);
     await sleep(getDelay()*0.4);
   }
@@ -1946,7 +2226,7 @@ async function runNight() {
       ? `Sai già che questi sono LUPI: ${knownWolves.join(', ')}.`
       : knownInnocent.length ? `Hai già verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
     const prompt = `Sei il VEGGENTE. ${seerKnowledge} ${coherenceCtx} Scegli chi investigare tra: ${(unseenTargets.length?unseenTargets:targets).map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
-    const choice = await ask(seer, prompt, unseenTargets.length?unseenTargets:targets);
+    const choice = await ask(seer, prompt, unseenTargets.length?unseenTargets:targets, 'night_action');
     const target = game.players.find(p=>p.name===choice);
     if (target) {
       if (!seer.seenPlayers) seer.seenPlayers=[];
@@ -1959,21 +2239,24 @@ async function runNight() {
     await sleep(getDelay()*0.4);
   }
 
-  // ── 3. LUPI ───────────────────────────────────────────
+  // ── 3. LUPI (con chat notturna) ───────────────────────
   const aliveNow = game.players.filter(p=>!p.dead);
   const wolvesNow = aliveNow.filter(p=>p.role==='wolf');
   const nonWolvesNow = aliveNow.filter(p=>p.role!=='wolf');
   if (wolvesNow.length>0 && nonWolvesNow.length>0) {
-    setStatus(`Lupi (${wolvesNow.map(p=>p.name).join(', ')}) scelgono la vittima...`);
-    const wolfAlliesCtx = wolvesNow.length > 1
-      ? `Siete in squadra con: ${wolvesNow.map(p=>p.name).join(', ')}.`
-      : `Sei l'unico lupo rimasto.`;
-    const prevStatement = wolvesNow.map(p=>p.nightStatement?.trim()).filter(Boolean).join(' / ');
-    const coherenceCtx = prevStatement ? `I lupi hanno detto: "${prevStatement}". Sii coerente.` : '';
-    const hasMatto = nonWolvesNow.some(p=>p.role==='jester');
-    const mattoCtx = hasMatto ? ` C'è un Matto in gioco — se viene votato dal villaggio vince lui.` : '';
-    const prompt = `Sei un LUPO. ${wolfAlliesCtx} ${coherenceCtx}${mattoCtx} Scegli chi eliminare stanotte tra: ${nonWolvesNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
-    killed_name = await ask(wolvesNow[0], prompt, nonWolvesNow);
+    setStatus(`Lupi (${wolvesNow.map(p=>p.name).join(', ')}) si coordinano...`);
+
+    // Chat notturna lupi (se più di uno)
+    if (wolvesNow.length > 1) {
+      killed_name = await runWolfChat(wolvesNow, nonWolvesNow);
+    } else {
+      // Un solo lupo — scelta diretta
+      const wolf = wolvesNow[0];
+      const hasMatto = nonWolvesNow.some(p=>p.role==='jester');
+      const mattoCtx = hasMatto ? ` C'è un Matto in gioco — se viene votato dal villaggio vince lui.` : '';
+      const prompt = `Sei l'unico LUPO rimasto.${mattoCtx} Scegli chi eliminare stanotte tra: ${nonWolvesNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+      killed_name = await ask(wolf, prompt, nonWolvesNow, 'night_action');
+    }
 
     if (killed_name === protected_name) {
       addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ✅ SALVATO dal Guaritore!`);
@@ -2071,6 +2354,11 @@ async function runDay(nightResult) {
   updateSuggestions();
   updateNarratorTargets();
 
+  // Ordine randomico fisso per tutto il giorno
+  const alivePlayers = game.players.filter(p=>!p.dead);
+  const dayOrder = [...alivePlayers].sort(()=>Math.random()-0.5);
+  game.dayOrder = dayOrder.map(p=>p.name);
+
   // Annunci morti della notte
   if (sheriffKilled) {
     addSystemMsg(`🔫 Nella notte lo Sceriffo ha sparato: ${sheriffKilled} è stato ucciso!`);
@@ -2083,25 +2371,28 @@ async function runDay(nightResult) {
   if (!killed && !sheriffKilled) {
     addSystemMsg(`Nessuno è morto stanotte. I lupi sono ancora tra noi.`);
   }
-  await sleep(getDelay()*0.5);
 
-  const commonStrategies = `Strategie disponibili (usale senza dichiararle esplicitamente): Accountability Framework, Graveyard Analysis, Pattern di voto su tutti i giorni, Accusare i silenziosi, Rules Lawyering, Behavioral Analysis, LYLO Awareness, Silenzio strategico, Redemption Arc.`;
+  // Badge sindaco nella discussione
+  const mayorBadge = game.mayorName ? ` [🏛️ Sindaco: ${game.mayorName}]` : '';
+  await sleep(getDelay()*0.5);
 
   const discussionHistory = [];
 
   for (let round = 1; round <= 3; round++) {
-    addSep(`— DISCUSSIONE — turno ${round}/3`);
+    addSep(`— DISCUSSIONE — turno ${round}/3${mayorBadge}`);
     const aliveCurrent = game.players.filter(p=>!p.dead);
+    // Usa l'ordine del giorno filtrato per i vivi
+    const orderedAlive = dayOrder.filter(p=>!p.dead);
 
-    for (let i = 0; i < aliveCurrent.length; i++) {
-      const p = aliveCurrent[i];
+    for (let i = 0; i < orderedAlive.length; i++) {
+      const p = orderedAlive[i];
       if (!isRunning) return;
       await waitIfPaused();
 
-      const alreadySpoke = aliveCurrent.slice(0,i).map(x=>x.name);
-      const yetToSpeak = aliveCurrent.slice(i+1).map(x=>x.name);
+      const alreadySpoke = orderedAlive.slice(0,i).map(x=>x.name);
+      const yetToSpeak = orderedAlive.slice(i+1).map(x=>x.name);
       const orderCtx = round===1
-        ? ` ${alreadySpoke.length ? `Hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio ancora.` : 'Sei l\'ultimo a parlare.'}`
+        ? ` ${alreadySpoke.length ? `Hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio ancora.` : "Sei l'ultimo a parlare."}`
         : '';
 
       const historyCtx = discussionHistory.length > 0
@@ -2113,14 +2404,21 @@ async function runDay(nightResult) {
             ? `È giorno ${game.night}. Stanotte ${[sheriffKilled,killed].filter(Boolean).join(' e ')} ${sheriffKilled&&killed?'sono stati eliminati':' è stato eliminato'}. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
             : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
         : round===2
-        ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti.`
-        : `Turno 3. Continua il dibattito, porta nuovi argomenti o rafforza i tuoi. Non devi ancora dichiarare il voto.`;
+        ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti. Puoi citare contraddizioni specifiche o fare pressione su chi ti sembra sospetto.`
+        : `Turno 3. Porta nuovi argomenti, rafforza la tua posizione, cerca di convincere gli indecisi. Non dichiarare ancora il voto.`;
 
-      const ctx = `${baseCtx}${orderCtx}${historyCtx}\n\nParla direttamente in personaggio — non analizzare ad alta voce, vai dritto al punto.`;
+      // Aggiorna trust score basandosi sulla discussione
+      discussionHistory.slice(-3).forEach(msg => {
+        if (msg.name !== p.name && msg.text.toLowerCase().includes(p.name.toLowerCase())) {
+          updateTrustScores(p, {type:'accused', target: msg.name});
+        }
+      });
+
+      const ctx = `${baseCtx}${orderCtx}${historyCtx}\n\nParla direttamente in personaggio — non analizzare ad alta voce, vai dritto al punto. Puoi tentare di manipolare psicologicamente gli altri citando comportamenti specifici o creando alleanze.`;
 
       showThinking(p);
       setStatus(`${p.name} parla (turno ${round}/3)...`);
-      const reply = await ask(p, ctx);
+      const reply = await ask(p, ctx, null, 'discuss');
       removeThinking();
       addMsg(p, reply, 'day');
       discussionHistory.push({name: p.name, text: reply});
@@ -2133,14 +2431,18 @@ async function runDay(nightResult) {
       for (const accused of accusedPlayers) {
         if (!isRunning) break;
         await waitIfPaused();
+        // Aggiorna trust score dell'accusato
+        updateTrustScores(accused, {type:'accused', target: p.name});
         await sleep(getDelay()*0.5);
         showThinking(accused);
         setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
-        const replyCtx = `${p.name} ha appena parlato di te: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi. La tua risposta non dà diritto ad ulteriori repliche.${historyCtx}`;
-        const replyMsg = await ask(accused, replyCtx);
+        const replyCtx = `${p.name} ha appena detto di te: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi. La tua risposta non dà diritto ad ulteriori repliche.${historyCtx}`;
+        const replyMsg = await ask(accused, replyCtx, null, 'discuss');
         removeThinking();
         addMsg(accused, replyMsg, 'day');
         discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
+        // Chi si difende bene guadagna trust
+        updateTrustScores(p, {type:'defended', target: accused.name});
         await sleep(getDelay()*0.8);
       }
 
@@ -2164,25 +2466,46 @@ async function runDay(nightResult) {
   for (const p of aliveFinal) votes[p.name]=0;
 
   const voteSummary = discussionHistory.length>0
-    ? `\n\nRiassunto discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
+    ? `\n\nRiassunto discussione:\n${discussionHistory.slice(-15).map(m=>`${m.name}: "${m.text.slice(0,80)}"`).join('\n')}`
     : '';
 
-  for (const voter of aliveFinal) {
+  // Ordine voto = stesso ordine del giorno
+  const voteOrder = dayOrder.filter(p=>!p.dead);
+  for (const voter of voteOrder) {
     if (!isRunning) return;
     await waitIfPaused();
     const candidates = aliveFinal.filter(p=>p.name!==voter.name);
     showThinking(voter);
     setStatus(`${voter.name} vota...`);
-    const choice = await ask(voter, `È il momento del voto. Basandoti sulla discussione, dichiara in una frase chi vuoi eliminare e perché, poi indica il nome esatto.${voter.role==='wolf'?' Giustifica il voto con argomenti da cittadino innocente.':voter.role==='jester'?' Ricorda: devi farti eliminare tu.':''}${voteSummary}`, candidates);
+    const mayorCtx = game.mayorName===voter.name ? ' Sei il Sindaco — il tuo voto conta doppio in caso di parità.' : '';
+    const votePrompt = `FASE DI VOTO. Analizza mentalmente chi è più pericoloso, poi dichiara il tuo voto in modo convincente con una motivazione.${voter.role==='wolf'?' Giustifica con argomenti da cittadino innocente.':voter.role==='jester'?' Vota per te stesso se possibile, o fai in modo di attirare voti su di te.':''}${mayorCtx}${voteSummary}\nRispondi con una frase di motivazione seguita dal nome esatto del tuo voto.`;
+    const choice = await ask(voter, votePrompt, candidates, 'vote');
     removeThinking();
     if (votes[choice]!==undefined) votes[choice]++;
     addMsg(voter, choice, 'vote');
+    // Aggiorna trust: chi vota contro qualcuno abbassa la sua fiducia
+    updateTrustScores(voter, {type:'suspicious', target: choice});
     await sleep(getDelay()*1.0);
   }
 
+  // Conta voti — sindaco decide in caso di parità
   const maxV = Math.max(...Object.values(votes));
   const top = Object.entries(votes).filter(([_,v])=>v===maxV).map(([n])=>n);
-  const eliminated = top[Math.floor(Math.random()*top.length)];
+  let eliminated;
+  if (top.length > 1 && game.mayorName && !game.players.find(p=>p.name===game.mayorName)?.dead) {
+    // Il sindaco decide
+    const mayor = game.players.find(p=>p.name===game.mayorName);
+    const mayorCandidates = top.map(n=>game.players.find(p=>p.name===n)).filter(Boolean);
+    addSystemMsg(`⚖️ Parità tra ${top.join(', ')}. Il Sindaco ${game.mayorName} decide!`);
+    showThinking(mayor);
+    const mayorChoice = await ask(mayor, `Sei il Sindaco e c'è parità tra: ${top.join(', ')}. Devi decidere tu chi bandire. Rispondi SOLO con il nome esatto.`, mayorCandidates, 'vote');
+    removeThinking();
+    eliminated = mayorChoice;
+    addMsg(mayor, `Come Sindaco, bandisco ${mayorChoice}.`, 'vote');
+  } else {
+    eliminated = top[Math.floor(Math.random()*top.length)];
+  }
+
   const target = game.players.find(p=>p.name===eliminated);
 
   if (target) {
@@ -2192,6 +2515,33 @@ async function runDay(nightResult) {
     addSystemMsg(`Il verdetto: ${eliminated} viene bandito. Era ${rmap[target.role]}!`);
     addEvent(`${eliminated} bandito (${target.role==='wolf'?'LUPO!':target.role==='jester'?'MATTO!':'innocente'})`, 'vote');
     playSound('kill');
+
+    // Aggiorna trust score per voto corretto/sbagliato
+    aliveFinal.forEach(voter => {
+      if (target.role === 'wolf') {
+        updateTrustScores(voter, {type:'voted_correctly', target: eliminated});
+      }
+    });
+
+    // Successore sindaco
+    if (target.isMayor) {
+      const aliveSorted = game.players.filter(p=>!p.dead);
+      if (aliveSorted.length > 0) {
+        showThinking(target);
+        setStatus(`${target.name} (Sindaco) nomina un successore...`);
+        const successorPrompt = `Sei il Sindaco e sei stato bandito. Prima di andartene, nomina il tuo successore tra: ${aliveSorted.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+        const successor = await ask(target, successorPrompt, aliveSorted, 'mayor');
+        removeThinking();
+        const successorPlayer = game.players.find(p=>p.name===successor);
+        if (successorPlayer) {
+          successorPlayer.isMayor = true;
+          game.mayorName = successor;
+          addSystemMsg(`🏛️ ${target.name} nomina ${successor} come nuovo Sindaco!`);
+          updatePlayersList();
+        }
+      }
+    }
+
     if (target.role === 'jester') { showWin('jester'); return; }
   }
 
@@ -2206,15 +2556,88 @@ async function runDay(nightResult) {
 }
 
 async function runGame() {
+  // Giorno 0: elezione sindaco
+  await runMayorElection();
+  if (!isRunning) return;
+
   while (isRunning) {
     const nightResult = await runNight();
     updatePlayersList(); updateStats();
-    const w1=checkWin(); if(w1){showWin(w1);return;}
+    const w1=checkWin(); if(w1){showWin(w1); await runPostGameAnalysis(w1); return;}
     await sleep(getDelay()*1.5);
     await runDay(nightResult);
-    const w2=checkWin(); if(w2){showWin(w2);return;}
+    const w2=checkWin(); if(w2){showWin(w2); await runPostGameAnalysis(w2); return;}
     await sleep(getDelay()*1.5);
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// POST-GAME ANALYSIS (reflection + opponent profiling)
+// ═══════════════════════════════════════════════════════
+async function runPostGameAnalysis(winner) {
+  if (!keys['nvidia']) return; // Serve NVIDIA per GLM-5
+  addSystemMsg('🧠 Analisi post-partita in corso... (reflection e profiling giocatori)');
+  setStatus('Analisi post-partita...');
+
+  const rmap = {wolf:'Lupo',seer:'Veggente',healer:'Guaritore',sheriff:'Sceriffo',jester:'Matto',villager:'Villager'};
+  const winnerLabel = winner==='wolves'?'I lupi':winner==='village'?'Il villaggio':'Il Matto';
+  const gameLog = game.dayHistory.map(d =>
+    `Giorno ${d.dayNum}: ${d.statements.map(s=>`${s.name}: "${s.text}"`).join(' | ')} → Bandito: ${d.eliminated||'nessuno'} (${d.eliminatedRole||''})`
+  ).join('\n');
+
+  const profiles = loadProfiles();
+  const reflections = loadReflections();
+
+  for (const player of game.players) {
+    if (!isRunning && !game.gameOver) break;
+    await sleep(2000);
+
+    const playerRole = rmap[player.role] || 'Villager';
+    const survived = !player.dead ? 'sopravvissuto' : 'eliminato';
+    const won = (winner==='wolves' && player.role==='wolf') ||
+                (winner==='village' && player.role!=='wolf') ||
+                (winner==='jester' && player.role==='jester');
+
+    const gameSummary = `Partita di Lupus in Fabula. Vincitore: ${winnerLabel}.
+Giocatore: ${player.name} — Ruolo: ${playerRole} — Esito: ${survived}, ${won?'ha vinto':'ha perso'}.
+Log partita:\n${gameLog}`;
+
+    // Reflection
+    const reflectionSys = `Sei un analista di giochi sociali. Analizza la performance del giocatore "${player.name}" in questa partita di Lupus in Fabula.`;
+    const reflectionPrompt = `${gameSummary}\n\nScrivi una reflection IN PRIMA PERSONA da parte di "${player.name}" in 2-3 frasi: cosa ha fatto bene, cosa ha sbagliato, e una lezione specifica per la prossima partita. Sii concreto e critico.`;
+    const reflection = await callGLM5(reflectionSys, reflectionPrompt);
+    if (reflection) {
+      reflections[player.name] = { text: reflection, date: new Date().toISOString(), role: playerRole, won };
+    }
+
+    await sleep(2000);
+
+    // Opponent profiling
+    const profilingSys = `Sei un analista comportamentale di giochi sociali. Analizza il comportamento osservabile del giocatore "${player.name}".`;
+    const profilingPrompt = `${gameSummary}\n\nAnalizza il comportamento di "${player.name}" e restituisci un JSON con questo formato esatto (senza markdown):
+{"tendencies":["tendenza1","tendenza2","tendenza3"],"style":"una parola","strengths":"punto di forza principale","weaknesses":"debolezza principale"}
+Massimo 3 tendenze, molto specifiche e osservabili (es. "accusa il primo a parlare", "cambia posizione sotto pressione", "costruisce alleanze nel turno 2").`;
+    const profilingRaw = await callGLM5(profilingSys, profilingPrompt);
+    if (profilingRaw) {
+      try {
+        const clean = profilingRaw.replace(/```json|```/g,'').trim();
+        const parsed = JSON.parse(clean);
+        if (!profiles[player.name]) profiles[player.name] = { gamesPlayed:0, wins:0 };
+        profiles[player.name].gamesPlayed = (profiles[player.name].gamesPlayed||0) + 1;
+        if (won) profiles[player.name].wins = (profiles[player.name].wins||0) + 1;
+        profiles[player.name].tendencies = parsed.tendencies || profiles[player.name].tendencies || [];
+        profiles[player.name].style = parsed.style || profiles[player.name].style;
+        profiles[player.name].strengths = parsed.strengths;
+        profiles[player.name].weaknesses = parsed.weaknesses;
+        profiles[player.name].lastRole = playerRole;
+      } catch(e) { /* parsing fallito, ignora */ }
+    }
+  }
+
+  saveProfiles(profiles);
+  saveReflections(reflections);
+  addSystemMsg(`✅ Analisi completata. Profili e riflessioni salvati per ${game.players.length} giocatori.`);
+  setStatus('Analisi completata.');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2250,7 +2673,7 @@ function startGame() {
         dead: false, role: null, seenPlayers: [],
       };
     }),
-    night:0, phase:'setup', deathLog:[], gameOver:false, dayHistory:[],
+    night:0, phase:'setup', deathLog:[], gameOver:false, dayHistory:[], mayorName:null, dayOrder:[],
   };
 
   assignRoles(game.players);updatePlayersList(); updateStats();
