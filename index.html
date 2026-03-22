@@ -1062,7 +1062,7 @@ function toggleSetup(btn) {
 }
 
 let testRunning = false;
-let testLastIndex = 0;
+let testLastIndex = 62;
 let testResults = {};
 
 function stopModelTest() {
@@ -1109,7 +1109,7 @@ async function testAllModels() {
   let fail = Object.values(testResults).filter(r=>r.status==='#dc2626').length;
   let skip = Object.values(testResults).filter(r=>r.status==='var(--text-faint)').length;
 
-  for (let i = testLastIndex; i < allModels.length; i++) {
+  for (let i = testLastIndex; i < Math.min(allModels.length, 70); i++) {
     if (!testRunning) { testLastIndex = i; break; }
     const m = allModels[i];
 
