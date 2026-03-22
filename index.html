@@ -480,7 +480,6 @@ const PROVIDERS = [
     limit: 'free tier',
     models: [
       { id: 'meta-llama/Llama-3.1-8B-Instruct',   label: 'LLaMA 3.1 8B' },
-      { id: 'Qwen/Qwen3-8B',                       label: 'Qwen3 8B' },
       { id: 'Qwen/QwQ-32B',                        label: 'Qwen 3.5 9B' },
       { id: 'tiiuae/falcon-7b-instruct',           label: 'Falcon 7B' },
     ],
@@ -634,7 +633,6 @@ const PROVIDERS = [
       { id: 'mistralai/mistral-small-24b-instruct',       label: 'Mistral Small 24B' },
       { id: 'mistralai/magistral-small-2506',             label: 'Magistral Small' },
       { id: 'qwen/qwq-32b',                               label: 'QwQ 32B' },
-      { id: 'qwen/qwen3-5-122b-a10b',                     label: 'Qwen 3.5 122B ⚠️' },
       { id: 'igenius/italia_10b_instruct_16k',            label: 'Italia 10B 🇮🇹' },
       { id: 'marin/marin-8b-instruct',                    label: 'Marin 8B' },
       { id: 'tiiuae/falcon3-7b-instruct',                 label: 'Falcon 3 7B' },
@@ -674,7 +672,6 @@ const PROVIDERS = [
       { id: '@cf/moonshotai/kimi-k2-5',                            label: 'Kimi K2.5' },
       { id: '@cf/z-ai/glm-4-7-flash',                              label: 'GLM-4.7 Flash' },
       { id: '@cf/nvidia/nemotron-3-120b-a12b',                     label: 'Nemotron 3 120B' },
-      { id: '@cf/qwen/qwen3-30b-a3b-fp8',                          label: 'Qwen3 30B' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('/api/cloudflare', {
@@ -732,7 +729,6 @@ const PROVIDERS = [
       { id: 'arcee-ai/trinity-mini:free',                        label: 'Trinity Mini' },
       { id: 'nvidia/nvidia-nemotron-nano-9b-v2:free',            label: 'Nemotron Nano 9B V2' },
       { id: 'nvidia/nemotron-nano-12b-v2-vl:free',               label: 'Nemotron Nano 12B V2' },
-      { id: 'qwen/qwen3-next-80b-a3b-instruct:free',             label: 'Qwen3 Next 80B' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -887,18 +883,8 @@ const MODEL_CHAIN = {
   'qwen3-32b': ['groq:qwen/qwen3-32b','sambanova:Qwen3-32B'],
   // Qwen3 235B
   'qwen3-235b': ['cerebras:qwen-3-235b-a22b-instruct-2507','sambanova:Qwen3-235B-A22B-Instruct-2507','fireworks:accounts/fireworks/models/qwen3-235b-a22b'],
-  // Qwen3 30B
-  'qwen3-30b': ['cloudflare:@cf/qwen/qwen3-30b-a3b-fp8','fireworks:accounts/fireworks/models/qwen3-30b-a3b'],
-  // Qwen3 8B
-  'qwen3-8b': ['huggingface:Qwen/Qwen3-8B'],
-  // Qwen 3.5 9B
-  'qwen3.5-9b': ['huggingface:Qwen/QwQ-32B'],
-  // Qwen3 Next 80B
-  'qwen3-next-80b': ['openrouter:qwen/qwen3-next-80b-a3b-instruct:free'],
   // QwQ 32B
   'qwq-32b': ['nvidia:qwen/qwq-32b'],
-  // Qwen 3.5 122B
-  'qwen3.5-122b': ['nvidia:qwen/qwen3-5-122b-a10b'],
   // DeepSeek R1
   'deepseek-r1': ['sambanova:DeepSeek-R1-0528', 'deepseek:deepseek-reasoner', 'github:deepseek/deepseek-r1', 'fireworks:accounts/fireworks/models/deepseek-r1-0528'],
   // DeepSeek R1 Distill LLaMA
@@ -1021,8 +1007,6 @@ const MODEL_CHAIN = {
   'trinity-large': ['arcee:arcee-ai/trinity-large-preview', 'openrouter:arcee-ai/trinity-large-preview:free'],
   // Trinity Mini
   'trinity-mini': ['arcee:arcee-ai/trinity-mini', 'openrouter:arcee-ai/trinity-mini:free'],
-  // Qwen3 Next 80B
-  'qwen3-next-80b': ['openrouter:qwen/qwen3-next-80b-a3b-instruct:free'],
 };
 
 // Lista unica di tutti i modelli per l'UI — costruita dinamicamente
@@ -1062,7 +1046,7 @@ function toggleSetup(btn) {
 }
 
 let testRunning = false;
-let testLastIndex = 62;
+let testLastIndex = 0;
 let testResults = {};
 
 function stopModelTest() {
@@ -1109,7 +1093,7 @@ async function testAllModels() {
   let fail = Object.values(testResults).filter(r=>r.status==='#dc2626').length;
   let skip = Object.values(testResults).filter(r=>r.status==='var(--text-faint)').length;
 
-  for (let i = testLastIndex; i < Math.min(allModels.length, 70); i++) {
+  for (let i = testLastIndex; i < allModels.length; i++) {
     if (!testRunning) { testLastIndex = i; break; }
     const m = allModels[i];
 
