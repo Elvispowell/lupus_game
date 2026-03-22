@@ -847,21 +847,21 @@ const PROVIDERS = [
 // PLAYER SLOTS
 // ═══════════════════════════════════════════════════════
 const PLAYER_SLOTS = [
-  { emoji:'🟢', personality:'analitico, preciso, ragionamento logico freddo, cita probabilità',           defaultProvider:'github',    defaultModel:'openai/gpt-4.1' },
-  { emoji:'🔵', personality:'creativo, costruisce consenso, usa analogie, tende a mediare',               defaultProvider:'google',    defaultModel:'gemini-2.5-flash-lite' },
-  { emoji:'🟣', personality:'riflessivo, cauto, attento alle contraddizioni, etico',                      defaultProvider:'groq',      defaultModel:'llama-3.3-70b-versatile' },
-  { emoji:'⚫', personality:'diretto, sarcastico, provocatorio, sfida le opinioni altrui',                defaultProvider:'groq',      defaultModel:'moonshotai/kimi-k2-instruct' },
-  { emoji:'🔴', personality:'conciso, pragmatico, europeo, diffidente dei colossi tech',                  defaultProvider:'groq',      defaultModel:'qwen/qwen3-32b' },
-  { emoji:'🟤', personality:'open source, populista, difende trasparenza, sospettoso delle AI chiuse',    defaultProvider:'sambanova', defaultModel:'Meta-Llama-3.3-70B-Instruct' },
-  { emoji:'🟡', personality:'professionale, integrato, cerca mediazione, evita conflitti diretti',        defaultProvider:'groq',      defaultModel:'llama-3.3-70b-versatile' },
-  { emoji:'🩵', personality:'ragionamento profondo, cerca prove concrete prima di concludere',             defaultProvider:'cerebras',  defaultModel:'llama3.1-8b' },
-  { emoji:'🟠', personality:'sintetico, orientato ai risultati, pragmatico e diretto',                    defaultProvider:'groq',      defaultModel:'llama-3.1-8b-instant' },
-  { emoji:'🩶', personality:'metodico, ragionamento strutturato, equilibrato tra creatività e logica',    defaultProvider:'groq',      defaultModel:'llama-3.1-8b-instant' },
-  { emoji:'🟥', personality:'impulsivo, emotivo, reagisce di pancia, si fida dell\'istinto',              defaultProvider:'mistral',   defaultModel:'mistral-small-latest' },
-  { emoji:'🟦', personality:'diplomatico, cerca sempre il compromesso, evita scontri diretti',            defaultProvider:'sambanova', defaultModel:'DeepSeek-R1-0528' },
+  { emoji:'🟢', color:'#f0fdf4', personality:'analitico, preciso, ragionamento logico freddo, cita probabilità e pattern',          defaultModel:'gemini-2.5-flash'  },
+  { emoji:'🔵', color:'#eff6ff', personality:'creativo, costruisce consenso, usa analogie e metafore, tende a mediare',             defaultModel:'kimi-k2.5'         },
+  { emoji:'🩵', color:'#f0fdfa', personality:'riflessivo, cauto, attento alle contraddizioni, ragiona per esclusione',              defaultModel:'deepseek-v3.2'     },
+  { emoji:'🟤', color:'#fdf4f0', personality:'diretto, pragmatico, va al punto, poco diplomatico ma onesto',                        defaultModel:'glm-5'             },
+  { emoji:'⚫', color:'#1a1a1a', personality:'sarcastico, provocatorio, sfida le opinioni altrui, gioca con le emozioni',           defaultModel:'gpt-4.1'           },
+  { emoji:'🟣', color:'#faf5ff', personality:'intuitivo, segue l\'istinto, si fida delle prime impressioni, emotivo',              defaultModel:'qwen3-32b'         },
+  { emoji:'🟠', color:'#fff7ed', personality:'professionale, diplomatico, cerca sempre il compromesso, evita scontri diretti',      defaultModel:'mistral-large'     },
+  { emoji:'🩷', color:'#fdf2fb', personality:'empatico, difende i deboli, sensibile ai cambi di umore degli altri',                defaultModel:'llama-3.3-70b'     },
+  { emoji:'🔴', color:'#fef2f2', personality:'impulsivo, reagisce di pancia, cambia idea facilmente sotto pressione',              defaultModel:'minimax-m2.5'      },
+  { emoji:'🤍', color:'#fafafa', personality:'metodico, ragionamento strutturato, non si espone mai troppo, osserva prima',         defaultModel:'jamba-large-1.7'   },
+  { emoji:'🩶', color:'#f5f5f5', personality:'scettico, diffidente, mette in dubbio tutto, cerca sempre il secondo fine',          defaultModel:'command-r7b'       },
+  { emoji:'🟡', color:'#fefce8', personality:'ottimista, cerca l\'accordo, evita i conflitti, si fida facilmente degli altri',     defaultModel:'solar-pro3'        },
 ];
 
-const BG_COLORS = ['#f0fdf4','#eff6ff','#faf5ff','#fff7ed','#fef2f2','#f0fdfa','#fefce8','#fdf4ff','#fdf2fb','#f0f9ff'];
+const BG_COLORS = PLAYER_SLOTS.map(s => s.color);
 
 // ═══════════════════════════════════════════════════════
 // FALLBACK CHAIN — modello → provider in ordine di priorità
@@ -1331,22 +1331,34 @@ function updateChipName(i) {
 function rebuildAssignGrid() {
   const n = parseInt(document.getElementById('num-players-select').value);
   const grid = document.getElementById('assign-grid');
-  grid.innerHTML = '';
   const allModels = buildUnifiedModels();
   const optsHTML = allModels.length
     ? allModels.map(m=>`<option value="${m.key}">${m.label}</option>`).join('')
     : '<option value="">— nessun modello disponibile —</option>';
 
-  PLAYER_SLOTS.slice(0, n).forEach((slot, i) => {
+  // Aggiorna solo i chip mancanti o in eccesso, preservando le selezioni esistenti
+  const existingChips = grid.querySelectorAll('.assign-chip');
+
+  // Rimuovi chip in eccesso
+  for (let i = existingChips.length - 1; i >= n; i--) {
+    existingChips[i].remove();
+  }
+
+  // Aggiungi chip mancanti
+  for (let i = existingChips.length; i < n; i++) {
+    const slot = PLAYER_SLOTS[i];
     const chip = document.createElement('div');
     chip.className = 'assign-chip';
-    chip.innerHTML = `
-      <span class="chip-emoji">${slot.emoji}</span>
-      <select id="assign-${i}">${optsHTML}</select>`;
+    chip.dataset.index = i;
+    chip.innerHTML = `<span class="chip-emoji">${slot.emoji}</span><select id="assign-${i}">${optsHTML}</select>`;
     grid.appendChild(chip);
+    // Pre-seleziona il modello di default dello slot
     const sel = document.getElementById(`assign-${i}`);
-    sel.selectedIndex = i % allModels.length;
-  });
+    if (sel && slot.defaultModel) {
+      const opt = [...sel.options].find(o => o.value === slot.defaultModel);
+      if (opt) sel.value = slot.defaultModel;
+    }
+  }
 }
 
 function getAssignment(i) {
@@ -2669,7 +2681,7 @@ function startGame() {
         name: modelEntry.label,
         providerLabel: modelEntry.label,
         modelKey: modelEntry.key,
-        bg: BG_COLORS[i%BG_COLORS.length],
+        bg: slot.color,
         dead: false, role: null, seenPlayers: [],
       };
     }),
