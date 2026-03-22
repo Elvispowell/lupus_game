@@ -1339,6 +1339,15 @@ function addSystemMsg(text) {
   wrap.scrollIntoView({behavior:'smooth'});
 }
 
+function addNarratorSecret(html) {
+  const log = document.getElementById('chat-log');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:0.3rem 0;padding:0.5rem 0.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#713f12;font-family:var(--font-mono,monospace);cursor:pointer;';
+  wrap.innerHTML = `<span style="opacity:0.6;font-size:0.65rem">📜 solo tu vedi questo · </span>${html}`;
+  log.appendChild(wrap);
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
 function showThinking(player) {
   const log = document.getElementById('chat-log');
   const wrap = document.createElement('div');
