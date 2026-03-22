@@ -782,7 +782,7 @@ const PROVIDERS = [
       { id: 'glm-4-32b-0414',   label: 'GLM-4 32B' },
     ],
     call: async (key, model, sys, usr) => {
-      const r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      const r = await fetch('https://api.z.ai/api/paas/v4/chat/completions', {
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
         body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
           messages:[{role:'system',content:sys},{role:'user',content:usr}] })
