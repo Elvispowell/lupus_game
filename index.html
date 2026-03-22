@@ -732,6 +732,133 @@ const PROVIDERS = [
       return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
     }
   },
+  {
+    id: 'openrouter', name: 'OpenRouter', color: '#6366f1',
+    placeholder: 'sk-or-...', validate: k => k.startsWith('sk-or-') && k.length > 20,
+    limit: '200 req/g gratis',
+    models: [
+      { id: 'stepfun-ai/step-3-5-flash:free',                    label: 'Step 3.5 Flash' },
+      { id: 'nvidia/llama-3.1-nemotron-3-super-120b-a12b:free',  label: 'Nemotron 3 Super 120B' },
+      { id: 'arcee-ai/trinity-large-preview:free',               label: 'Trinity Large Preview' },
+      { id: 'z-ai/glm-4.5-air:free',                             label: 'GLM-4.5 Air' },
+      { id: 'nvidia/llama-3.1-nemotron-3-nano-30b-a3b:free',     label: 'Nemotron 3 Nano 30B' },
+      { id: 'arcee-ai/trinity-mini:free',                        label: 'Trinity Mini' },
+      { id: 'nvidia/nvidia-nemotron-nano-9b-v2:free',            label: 'Nemotron Nano 9B V2' },
+      { id: 'nvidia/nemotron-nano-12b-v2-vl:free',               label: 'Nemotron Nano 12B V2' },
+      { id: 'qwen/qwen3-next-80b-a3b-instruct:free',             label: 'Qwen3 Next 80B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`,'HTTP-Referer':'https://lupus-ai.vercel.app','X-Title':'AI Lupus in Fabula'},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'zai', name: 'Z.ai (GLM)', color: '#0ea5e9',
+    placeholder: '...', validate: k => k.length > 15,
+    limit: 'GLM-4.7-Flash gratuito',
+    models: [
+      { id: 'glm-4.7-flash',    label: 'GLM-4.7 Flash' },
+      { id: 'glm-4.7-flashx',   label: 'GLM-4.7 FlashX' },
+      { id: 'glm-4.7',          label: 'GLM-4.7' },
+      { id: 'glm-4.6',          label: 'GLM-4.6' },
+      { id: 'glm-4.6v-flash',   label: 'GLM-4.6V Flash' },
+      { id: 'glm-4.6v',         label: 'GLM-4.6V' },
+      { id: 'glm-4.5',          label: 'GLM-4.5' },
+      { id: 'glm-4.5-air',      label: 'GLM-4.5 Air' },
+      { id: 'glm-4.5-airx',     label: 'GLM-4.5 AirX' },
+      { id: 'glm-4.5-flash',    label: 'GLM-4.5 Flash' },
+      { id: 'glm-4.5v',         label: 'GLM-4.5V' },
+      { id: 'glm-5-turbo',      label: 'GLM-5 Turbo' },
+      { id: 'glm-5',            label: 'GLM-5' },
+      { id: 'glm-4-plus',       label: 'GLM-4 Plus' },
+      { id: 'glm-4-32b-0414',   label: 'GLM-4 32B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'deepseek', name: 'DeepSeek', color: '#2563eb',
+    placeholder: 'sk-...', validate: k => k.startsWith('sk-') && k.length > 20,
+    limit: 'pay-per-use economico',
+    models: [
+      { id: 'deepseek-chat',     label: 'DeepSeek V3.2' },
+      { id: 'deepseek-reasoner', label: 'DeepSeek R1' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.deepseek.com/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'upstage', name: 'Upstage', color: '#7c3aed',
+    placeholder: 'up_...', validate: k => k.length > 15,
+    limit: 'free tier',
+    models: [
+      { id: 'solar-pro2',  label: 'Solar Pro 2' },
+      { id: 'solar-pro3',  label: 'Solar Pro 3' },
+      { id: 'solar-mini',  label: 'Solar Mini' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://api.upstage.ai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
+    id: 'arcee', name: 'Arcee AI', color: '#059669',
+    placeholder: '...', validate: k => k.length > 15,
+    limit: 'free tier',
+    models: [
+      { id: 'arcee-ai/trinity-large-preview', label: 'Trinity Large Preview' },
+      { id: 'arcee-ai/trinity-mini',          label: 'Trinity Mini' },
+      { id: 'arcee-ai/trinity-nano',          label: 'Trinity Nano' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://models.arcee.ai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -755,6 +882,249 @@ const PLAYER_SLOTS = [
 const BG_COLORS = ['#f0fdf4','#eff6ff','#faf5ff','#fff7ed','#fef2f2','#f0fdfa','#fefce8','#fdf4ff','#fdf2fb','#f0f9ff'];
 
 // ═══════════════════════════════════════════════════════
+// FALLBACK CHAIN — modello → provider in ordine di priorità
+// ═══════════════════════════════════════════════════════
+const MODEL_CHAIN = {
+  // LLaMA 3.3 70B
+  'llama-3.3-70b': ['groq:llama-3.3-70b-versatile','sambanova:Meta-Llama-3.3-70B-Instruct','github:meta/llama-3.3-70b-instruct','nvidia:meta/llama-3.3-70b-instruct','fireworks:accounts/fireworks/models/llama-v3p3-70b-instruct'],
+  // LLaMA 3.1 8B
+  'llama-3.1-8b': ['groq:llama-3.1-8b-instant','cerebras:llama3.1-8b','sambanova:Meta-Llama-3.1-8B-Instruct','github:meta/meta-llama-3.1-8b-instruct','huggingface:meta-llama/Llama-3.1-8B-Instruct','fireworks:accounts/fireworks/models/llama-v3p1-405b-instruct'],
+  // LLaMA 3.1 405B
+  'llama-3.1-405b': ['github:meta/meta-llama-3.1-405b-instruct','nvidia:meta/llama-3.1-405b-instruct','fireworks:accounts/fireworks/models/llama-v3p1-405b-instruct'],
+  // LLaMA 3.2 1B
+  'llama-3.2-1b': ['huggingface:meta-llama/Llama-3.2-1B-Instruct'],
+  // LLaMA 3.2 11B
+  'llama-3.2-11b': ['github:meta/meta-llama-3.2-11b-vision-instruct'],
+  // LLaMA 4 Scout
+  'llama-4-scout': ['groq:meta-llama/llama-4-scout-17b-16e-instruct','cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct','github:meta/llama-4-scout-17b-16e-instruct','fireworks:accounts/fireworks/models/llama4-scout-instruct-basic'],
+  // LLaMA 4 Maverick
+  'llama-4-maverick': ['sambanova:Llama-4-Maverick-17B-128E-Instruct','github:meta/llama-4-maverick-17b-128e-instruct-fp8','fireworks:accounts/fireworks/models/llama4-maverick-instruct-basic'],
+  // LLaMA 3.3 Swallow
+  'llama-3.3-swallow': ['sambanova:Llama-3.3-Swallow-70B-Instruct-v0.4'],
+  // GPT-OSS 120B
+  'gpt-oss-120b': ['groq:openai/gpt-oss-120b','cerebras:gpt-oss-120b','sambanova:gpt-oss-120b','cloudflare:@cf/openai/gpt-oss-120b','nvidia:openai/gpt-oss-120b'],
+  // GPT-OSS 20B
+  'gpt-oss-20b': ['groq:openai/gpt-oss-20b','cloudflare:@cf/openai/gpt-oss-20b','nvidia:openai/gpt-oss-20b'],
+  // Kimi K2
+  'kimi-k2': ['groq:moonshotai/kimi-k2-instruct','nvidia:moonshotai/kimi-k2-instruct','fireworks:accounts/fireworks/models/kimi-k2-instruct'],
+  // Kimi K2.5
+  'kimi-k2.5': ['cloudflare:@cf/moonshotai/kimi-k2-5','nvidia:moonshotai/kimi-k2-instruct-0905'],
+  // Qwen3 32B
+  'qwen3-32b': ['groq:qwen/qwen3-32b','sambanova:Qwen3-32B'],
+  // Qwen3 235B
+  'qwen3-235b': ['cerebras:qwen-3-235b-a22b-instruct-2507','sambanova:Qwen3-235B-A22B-Instruct-2507','fireworks:accounts/fireworks/models/qwen3-235b-a22b'],
+  // Qwen3 30B
+  'qwen3-30b': ['cloudflare:@cf/qwen/qwen3-30b-a3b-fp8','fireworks:accounts/fireworks/models/qwen3-30b-a3b'],
+  // Qwen3 8B
+  'qwen3-8b': ['huggingface:Qwen/Qwen3-8B'],
+  // Qwen 3.5 9B
+  'qwen3.5-9b': ['huggingface:Qwen/QwQ-32B'],
+  // Qwen3 Next 80B
+  'qwen3-next-80b': ['openrouter:qwen/qwen3-next-80b-a3b-instruct:free'],
+  // QwQ 32B
+  'qwq-32b': ['nvidia:qwen/qwq-32b'],
+  // Qwen 3.5 122B
+  'qwen3.5-122b': ['nvidia:qwen/qwen3-5-122b-a10b'],
+  // DeepSeek R1
+  'deepseek-r1': ['sambanova:DeepSeek-R1-0528','github:deepseek/deepseek-r1','deepseek:deepseek-reasoner','fireworks:accounts/fireworks/models/deepseek-r1-0528'],
+  // DeepSeek R1 Distill LLaMA
+  'deepseek-r1-distill': ['sambanova:DeepSeek-R1-Distill-Llama-70B','nvidia:deepseek-ai/deepseek-r1-distill-qwen-32b'],
+  // DeepSeek V3
+  'deepseek-v3': ['sambanova:DeepSeek-V3-0324','github:deepseek/deepseek-v3-0324','fireworks:accounts/fireworks/models/deepseek-v3-0324'],
+  // DeepSeek V3.1
+  'deepseek-v3.1': ['sambanova:DeepSeek-V3.1','nvidia:deepseek-ai/deepseek-v3.1','fireworks:accounts/fireworks/models/deepseek-v3p1'],
+  // DeepSeek V3.1 Terminus
+  'deepseek-v3.1-terminus': ['sambanova:DeepSeek-V3.1-Terminus'],
+  // DeepSeek V3.2
+  'deepseek-v3.2': ['sambanova:DeepSeek-V3.2','nvidia:deepseek-ai/deepseek-v3.2','deepseek:deepseek-chat'],
+  // Gemini 2.5 Flash-Lite
+  'gemini-2.5-flash-lite': ['google:gemini-2.5-flash-lite'],
+  // Gemini 2.5 Flash
+  'gemini-2.5-flash': ['google:gemini-2.5-flash'],
+  // Gemini 2.5 Pro
+  'gemini-2.5-pro': ['google:gemini-2.5-pro'],
+  // Gemini 3 Flash
+  'gemini-3-flash': ['google:gemini-3-flash'],
+  // Gemini 3.1 Flash-Lite
+  'gemini-3.1-flash-lite': ['google:gemini-3.1-flash-lite'],
+  // MiniMax M2.5
+  'minimax-m2.5': ['sambanova:MiniMax-M2.5','nvidia:minimaxai/minimax-m2.5'],
+  // MiniMax M2.1
+  'minimax-m2.1': ['nvidia:minimaxai/minimax-m2.1'],
+  // GLM-5
+  'glm-5': ['nvidia:z-ai/glm5','zai:glm-5'],
+  // GLM-5 Turbo
+  'glm-5-turbo': ['zai:glm-5-turbo'],
+  // GLM-4.7
+  'glm-4.7': ['cerebras:zai-glm-4.7','nvidia:z-ai/glm4.7','zai:glm-4.7'],
+  // GLM-4.7 Flash
+  'glm-4.7-flash': ['cloudflare:@cf/z-ai/glm-4-7-flash','zai:glm-4.7-flash'],
+  // GLM-4.7 FlashX
+  'glm-4.7-flashx': ['zai:glm-4.7-flashx'],
+  // GLM-4.6
+  'glm-4.6': ['zai:glm-4.6'],
+  // GLM-4.6V
+  'glm-4.6v': ['zai:glm-4.6v'],
+  // GLM-4.6V Flash
+  'glm-4.6v-flash': ['zai:glm-4.6v-flash'],
+  // GLM-4.5
+  'glm-4.5': ['zai:glm-4.5'],
+  // GLM-4.5 Air
+  'glm-4.5-air': ['openrouter:z-ai/glm-4.5-air:free','zai:glm-4.5-air'],
+  // GLM-4.5 AirX
+  'glm-4.5-airx': ['zai:glm-4.5-airx'],
+  // GLM-4.5 Flash
+  'glm-4.5-flash': ['zai:glm-4.5-flash'],
+  // GLM-4.5V
+  'glm-4.5v': ['zai:glm-4.5v'],
+  // GLM-4 Plus
+  'glm-4-plus': ['zai:glm-4-plus'],
+  // GLM-4 32B
+  'glm-4-32b': ['zai:glm-4-32b-0414'],
+  // GPT-4.1
+  'gpt-4.1': ['github:openai/gpt-4.1'],
+  // GPT-4.1 Mini
+  'gpt-4.1-mini': ['github:openai/gpt-4.1-mini'],
+  // GPT-4o
+  'gpt-4o': ['github:openai/gpt-4o'],
+  // GPT-4o Mini
+  'gpt-4o-mini': ['github:openai/gpt-4o-mini'],
+  // Grok 3
+  'grok-3': ['github:xai/grok-3'],
+  // Grok 3 Mini
+  'grok-3-mini': ['github:xai/grok-3-mini'],
+  // Mistral Small
+  'mistral-small': ['github:mistral-ai/mistral-small-2503','mistral:mistral-small-latest','nvidia:mistralai/mistral-small-24b-instruct'],
+  // Mistral Medium
+  'mistral-medium': ['github:mistral-ai/mistral-medium-2505','mistral:mistral-medium-latest'],
+  // Mistral Large
+  'mistral-large': ['mistral:mistral-large-latest'],
+  // Mistral Small 3.1
+  'mistral-small-3.1': ['cloudflare:@cf/mistralai/mistral-small-3.1-24b-instruct'],
+  // Mistral 7B
+  'mistral-7b': ['huggingface:mistralai/Mistral-7B-Instruct-v0.3'],
+  // Codestral 25
+  'codestral-25': ['github:mistral-ai/codestral-2501'],
+  // Magistral Small
+  'magistral-small': ['nvidia:mistralai/magistral-small-2506'],
+  // Mixtral 8x22B
+  'mixtral-8x22b': ['nvidia:mistralai/mixtral-8x22b-instruct','fireworks:accounts/fireworks/models/mixtral-8x22b-instruct'],
+  // Phi-4
+  'phi-4': ['github:microsoft/phi-4'],
+  // Phi-4 Mini
+  'phi-4-mini': ['github:microsoft/phi-4-mini-instruct','nvidia:microsoft/phi-4-mini-instruct'],
+  // Jamba Large 1.7
+  'jamba-large-1.7': ['ai21:jamba-large-1.7','github:ai21-labs/ai21-jamba-1.5-large'],
+  // Jamba Mini 1.7
+  'jamba-mini-1.7': ['ai21:jamba-mini-1.7'],
+  // Jamba Large
+  'jamba-large': ['ai21:jamba-large'],
+  // Jamba Mini
+  'jamba-mini': ['ai21:jamba-mini'],
+  // Command A
+  'command-a': ['cohere:command-a-03-2025'],
+  // Command R+
+  'command-r+': ['cohere:command-r-plus-08-2024','github:cohere/cohere-command-r-plus-08-2024'],
+  // Command R
+  'command-r': ['cohere:command-r-08-2024','github:cohere/cohere-command-r-08-2024'],
+  // Command R7B
+  'command-r7b': ['cohere:command-r7b-12-2024'],
+  // Nemotron Super 49B
+  'nemotron-super-49b': ['nvidia:nvidia/llama-3.3-nemotron-super-49b-v1'],
+  // Nemotron Super 49B v1.5
+  'nemotron-super-49b-v1.5': ['nvidia:nvidia/llama-3.3-nemotron-super-49b-v1.5'],
+  // Nemotron Ultra 253B
+  'nemotron-ultra-253b': ['nvidia:nvidia/llama-3.1-nemotron-ultra-253b-v1'],
+  // Nemotron Nano 8B
+  'nemotron-nano-8b': ['nvidia:nvidia/llama-3.1-nemotron-nano-8b-v1'],
+  // Nemotron Nano 4B
+  'nemotron-nano-4b': ['nvidia:nvidia/llama-3.1-nemotron-nano-4b-v1_1'],
+  // Nemotron Mini 4B
+  'nemotron-mini-4b': ['nvidia:nvidia/nemotron-mini-4b-instruct'],
+  // Nemotron 3 Nano 30B
+  'nemotron-3-nano-30b': ['nvidia:nvidia/nemotron-3-nano-30b-a3b','openrouter:nvidia/llama-3.1-nemotron-3-nano-30b-a3b:free'],
+  // Nemotron 3 Super 120B
+  'nemotron-3-super-120b': ['nvidia:nvidia/nemotron-3-super-120b-a12b','cloudflare:@cf/nvidia/nemotron-3-120b-a12b','openrouter:nvidia/llama-3.1-nemotron-3-super-120b-a12b:free'],
+  // Nemotron Nano 9B v2
+  'nemotron-nano-9b-v2': ['nvidia:nvidia/nvidia-nemotron-nano-9b-v2','openrouter:nvidia/nvidia-nemotron-nano-9b-v2:free'],
+  // Nemotron Nano 12B V2
+  'nemotron-nano-12b-v2': ['openrouter:nvidia/nemotron-nano-12b-v2-vl:free'],
+  // Colosseum 355B
+  'colosseum-355b': ['nvidia:igenius/colosseum_355b_instruct_16k'],
+  // Italia 10B
+  'italia-10b': ['nvidia:igenius/italia_10b_instruct_16k'],
+  // Step 3.5 Flash
+  'step-3.5-flash': ['nvidia:stepfun-ai/step-3-5-flash','openrouter:stepfun-ai/step-3-5-flash:free'],
+  // Marin 8B
+  'marin-8b': ['nvidia:marin/marin-8b-instruct'],
+  // Falcon 3 7B
+  'falcon-3-7b': ['nvidia:tiiuae/falcon3-7b-instruct'],
+  // Falcon 7B
+  'falcon-7b': ['huggingface:tiiuae/falcon-7b-instruct'],
+  // SEA-Lion 7B
+  'sea-lion-7b': ['nvidia:aisingapore/sea-lion-7b-instruct'],
+  // RakutenAI 7B
+  'rakutenai-7b': ['nvidia:rakuten/rakutenai-7b-instruct'],
+  // Breeze 7B
+  'breeze-7b': ['nvidia:mediatek/breeze-7b-instruct'],
+  // Solar 10.7B
+  'solar-10.7b': ['nvidia:upstage/solar-10.7b-instruct'],
+  // Solar Pro 2
+  'solar-pro2': ['upstage:solar-pro2'],
+  // Solar Pro 3
+  'solar-pro3': ['upstage:solar-pro3'],
+  // Solar Mini
+  'solar-mini': ['upstage:solar-mini'],
+  // Baichuan2 13B
+  'baichuan2-13b': ['nvidia:baichuan-inc/baichuan2-13b-chat'],
+  // Granite 3.3 8B
+  'granite-3.3-8b': ['nvidia:ibm/granite-3_3-8b-instruct'],
+  // Granite 4.0 Micro
+  'granite-4.0-micro': ['cloudflare:@cf/ibm/granite-4.0-tiny'],
+  // Seed OSS 36B
+  'seed-oss-36b': ['nvidia:bytedance/seed-oss-36b-instruct'],
+  // Devstral 2 123B
+  'devstral-2-123b': ['nvidia:mistralai/devstral-2-123b-instruct-2512'],
+  // Hermes 2 Pro 7B
+  'hermes-2-pro-7b': ['cloudflare:@cf/nousresearch/hermes-2-pro-mistral-7b'],
+  // Trinity Large Preview
+  'trinity-large': ['openrouter:arcee-ai/trinity-large-preview:free','arcee:arcee-ai/trinity-large-preview'],
+  // Trinity Mini
+  'trinity-mini': ['openrouter:arcee-ai/trinity-mini:free','arcee:arcee-ai/trinity-mini'],
+  // Trinity Nano
+  'trinity-nano': ['arcee:arcee-ai/trinity-nano'],
+  // Qwen3 Next 80B
+  'qwen3-next-80b': ['openrouter:qwen/qwen3-next-80b-a3b-instruct:free'],
+  // MiniMax M2.5 Fast
+  'minimax-m2.5-fast': ['sambanova:MiniMax-M2.5'],
+  // Gemma 3 27B
+  'gemma-3-27b': ['fireworks:accounts/fireworks/models/gemma3-27b-it'],
+  // Phi-4 (Fireworks)
+  'phi-4-fireworks': ['fireworks:accounts/fireworks/models/phi-4'],
+  // LLaMA 3.3 70B Fast (Cloudflare)
+  'llama-3.3-70b-fast': ['cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
+};
+
+// Lista unica di tutti i modelli per l'UI — costruita dinamicamente
+function buildUnifiedModels() {
+  return Object.entries(MODEL_CHAIN).map(([key, chain]) => {
+    // Cerca il label nel primo provider che ha il modello
+    let label = key; // fallback
+    for (const entry of chain) {
+      const colonIdx = entry.indexOf(':');
+      const pid = entry.slice(0, colonIdx);
+      const mid = entry.slice(colonIdx + 1);
+      const provider = PROVIDERS.find(p=>p.id===pid);
+      if (provider) {
+        const modelObj = provider.models.find(m=>m.id===mid);
+        if (modelObj) { label = modelObj.label; break; }
+      }
+    }
+    return { key, label, chain };
+  }).sort((a,b) => a.label.localeCompare(b.label));
+}
+
+// ═══════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════
 let game = null;
@@ -771,7 +1141,23 @@ function toggleSetup(btn) {
   document.getElementById('setup-body').classList.toggle('open');
 }
 
+function saveKeysToStorage() {
+  try {
+    localStorage.setItem('lupus_keys', JSON.stringify(keys));
+  } catch(e) {}
+}
+
+function loadKeysFromStorage() {
+  try {
+    const saved = localStorage.getItem('lupus_keys');
+    if (!saved) return;
+    const parsed = JSON.parse(saved);
+    Object.assign(keys, parsed);
+  } catch(e) {}
+}
+
 function buildSetupPanel() {
+  loadKeysFromStorage();
   const grid = document.getElementById('providers-grid');
   grid.innerHTML = '';
   PROVIDERS.forEach(p => {
@@ -797,17 +1183,30 @@ function buildSetupPanel() {
       <div class="provider-models">${p.models.map(m=>m.label).join(' · ')}</div>`;
     grid.appendChild(card);
   });
+  // Ripristina le key salvate nei campi input
+  PROVIDERS.forEach(p => {
+    if (p.serverSide) return;
+    const input = document.getElementById(`key-${p.id}`);
+    const statusEl = document.getElementById(`status-${p.id}`);
+    if (input && keys[p.id]) {
+      input.value = keys[p.id];
+      statusEl.textContent = 'valida';
+      statusEl.className = 'provider-status ps-ok';
+    }
+  });
   rebuildAssignGrid();
+  checkCanStart();
 }
 
 function onKeyChange(pid) {
   const p = PROVIDERS.find(x => x.id === pid);
-  if (p.serverSide) return; // key gestita dal server
+  if (p.serverSide) return;
   const val = document.getElementById(`key-${pid}`).value.trim().replace(/[^\x20-\x7E]/g, '');
   const statusEl = document.getElementById(`status-${pid}`);
   if (!val) { keys[pid]=''; statusEl.textContent='vuota'; statusEl.className='provider-status ps-empty'; }
   else if (p.validate(val)) { keys[pid]=val; statusEl.textContent='valida'; statusEl.className='provider-status ps-ok'; }
   else { keys[pid]=''; statusEl.textContent='non valida'; statusEl.className='provider-status ps-err'; }
+  saveKeysToStorage();
   rebuildAssignGrid();
   checkCanStart();
 }
@@ -820,6 +1219,7 @@ function checkCanStart() {
   btn.disabled = !has;
   btn.textContent = has ? 'Inizia Partita' : 'Aggiungi almeno una key';
   setStatus(has ? 'Premi "Inizia Partita" per cominciare' : 'Configura le API key nel pannello sopra');
+  rebuildAssignGrid();
 }
 
 function getAvailableOptions() {
@@ -843,33 +1243,27 @@ function rebuildAssignGrid() {
   const n = parseInt(document.getElementById('num-players-select').value);
   const grid = document.getElementById('assign-grid');
   grid.innerHTML = '';
-  const opts = getAvailableOptions();
+  const allModels = buildUnifiedModels();
+  const optsHTML = allModels.length
+    ? allModels.map(m=>`<option value="${m.key}">${m.label}</option>`).join('')
+    : '<option value="">— nessun modello disponibile —</option>';
+
   PLAYER_SLOTS.slice(0, n).forEach((slot, i) => {
     const chip = document.createElement('div');
-    chip.className = 'assign-chip' + (opts.length ? '' : ' disabled');
-    const optsHTML = opts.length
-      ? opts.map((o,oi)=>`<option value="${oi}">${o.label}</option>`).join('')
-      : '<option value="">— nessuna key —</option>';
+    chip.className = 'assign-chip';
     chip.innerHTML = `
       <span class="chip-emoji">${slot.emoji}</span>
-      <span class="chip-label" id="chip-label-${i}">—</span>
-      <select id="assign-${i}" onchange="updateChipName(${i})">${optsHTML}</select>`;
+      <select id="assign-${i}">${optsHTML}</select>`;
     grid.appendChild(chip);
-    if (opts.length) {
-      const sel = document.getElementById(`assign-${i}`);
-      const pi = opts.findIndex(o=>o.providerId===slot.defaultProvider&&o.modelId===slot.defaultModel);
-      const fi = opts.findIndex(o=>o.providerId===slot.defaultProvider);
-      sel.selectedIndex = pi>=0 ? pi : (fi>=0 ? fi : i%opts.length);
-      updateChipName(i);
-    }
+    const sel = document.getElementById(`assign-${i}`);
+    sel.selectedIndex = i % allModels.length;
   });
 }
 
 function getAssignment(i) {
   const sel = document.getElementById(`assign-${i}`);
   if (!sel) return null;
-  const opts = getAvailableOptions();
-  return opts[parseInt(sel.value)] || opts[0] || null;
+  return sel.value || null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1212,13 +1606,28 @@ function flashNarratorBar() {
 // API CALL
 // ═══════════════════════════════════════════════════════
 async function callProvider(player, sys, usr) {
-  const provider = PROVIDERS.find(p=>p.id===player.providerId);
-  if (!provider) throw new Error('Provider non trovato');
-  const rawKey = provider.serverSide ? '' : keys[player.providerId];
-  if (!provider.serverSide && !rawKey) throw new Error('Provider non configurato');
-  const key = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').trim() : '';
-  await sleep(2500);
-  return await provider.call(key, player.modelId, sys, usr);
+  const chain = MODEL_CHAIN[player.modelKey];
+  if (!chain) throw new Error(`Modello non trovato: ${player.modelKey}`);
+
+  const errors = [];
+  for (const entry of chain) {
+    const colonIdx = entry.indexOf(':');
+    const pid = entry.slice(0, colonIdx);
+    const mid = entry.slice(colonIdx + 1);
+    const provider = PROVIDERS.find(p=>p.id===pid);
+    if (!provider) continue;
+    if (!provider.serverSide && !keys[pid]) continue;
+    const key = provider.serverSide ? '' : keys[pid].replace(/[^\x20-\x7E]/g,'').trim();
+    try {
+      await sleep(2500);
+      const result = await provider.call(key, mid, sys, usr);
+      player.lastUsedProvider = pid;
+      return result;
+    } catch(e) {
+      errors.push(`${pid}: ${e.message}`);
+    }
+  }
+  throw new Error(`Tutti i provider falliti: ${errors.join(' | ')}`);
 }
 
 function buildSysPrompt(player) {
@@ -1254,7 +1663,7 @@ function buildSysPrompt(player) {
   } else if (player.role==='jester') {
     roleInfo = `Sei il MATTO. Il tuo obiettivo è farti ELIMINARE DAL VOTO del villaggio — questa è l'unica cosa che conta. Se muori ucciso dai lupi o dallo sceriffo NON vinci. Strategie: sembrare sospetto senza esagerare (troppo ovvio e nessuno vota per te), provocare accuse deliberatamente, sfruttare la tensione tra lupi e cittadini, contraddirsi strategicamente, sembrare nervoso o evasivo. Non rivelare MAI che sei il Matto — fingiti un villager in difficoltà.`;
   } else {
-    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni, smascherai i lupi.${hasSheriff?' Nota: c\'è uno Sceriffo in gioco che può sparare di notte — potrebbe essere un alleato prezioso.':''}`;
+    roleInfo = `Sei un VILLAGER innocente. Analizza i comportamenti, cerca contraddizioni, smascherai i lupi.${hasSheriff?" Nota: c'è uno Sceriffo in gioco che può sparare di notte — potrebbe essere un alleato prezioso.":''}`;
   }
 
   return `Sei il modello AI "${player.name}". Personalità: ${player.personality}.
@@ -1417,69 +1826,113 @@ async function runNight() {
   playSound('night');
 
   addSystemMsg(`🌙 Notte ${game.night} — Ruoli attivi: ${rolesAlive.join(', ')}. Interrogali nell'ordine suggerito poi premi "Avanza verso l'alba".`);
-  setStatus('In attesa del narratore...');  addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
   setStatus('In attesa del narratore...');
-  await waitForAdvance('🗳️ Avanza al voto');
+  await waitForAdvance('☀️ Avanza verso l\'alba');
   await waitIfPaused();
 
-  addSep('— VOTAZIONE —');
-  addSystemMsg('Il villaggio vota chi bandire.');
-  updateSuggestions();
-  await sleep(getDelay()*0.5);
+  let protected_name = null;
+  let killed_name = null;
+  let sheriff_killed = null;
 
-  const votes = {};
-  const aliveFinal = game.players.filter(p=>!p.dead);
-  for (const p of aliveFinal) votes[p.name]=0;
-
-  const voteSummary = discussionHistory.length>0
-    ? `\n\nRiassunto della discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
-    : '';
-
-  for (const voter of aliveFinal) {
-    if (!isRunning) return;
-    await waitIfPaused();
-    const candidates = aliveFinal.filter(p=>p.name!==voter.name);
-
-    let choice;
-    showThinking(voter);
-      setStatus(`${voter.name} vota...`);
-      choice = await ask(voter, `È il momento del voto. Basandoti sulla discussione, dichiara in una frase chi vuoi eliminare e perché, poi indica il nome esatto.${voter.role==='wolf'?' Giustifica il tuo voto con argomenti da cittadino innocente — non rivelare mai la tua vera natura o i tuoi veri obiettivi.':voter.role==='jester'?' Ricorda il tuo obiettivo: devi farti eliminare tu, non votare strategicamente per il villaggio.':''}${voteSummary}`, candidates);
-      removeThinking();
-      addMsg(voter, choice, 'vote');
-
-    if (votes[choice]!==undefined) votes[choice]++;
-    await sleep(getDelay()*1.0);
+  // ── 0. SCERIFFO ───────────────────────────────────────
+  if (sheriff) {
+    setStatus(`${sheriff.name} (🔫 sceriffo) decide se sparare...`);
+    const prevStatement = sheriff.nightStatement?.trim();
+    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
+    const prompt = `Sei lo SCERIFFO. Hai UN proiettile per tutta la partita. Puoi scegliere di sparare stanotte oppure aspettare. ${coherenceCtx} Se vuoi sparare, di' "sparo a [nome]". Se no, di' "aspetto". Giocatori vivi: ${names}. Ragiona strategicamente — rivelare il tuo ruolo ti mette in pericolo.`;
+    const reply = await ask(sheriff, prompt);
+    const shotTarget = alive.filter(p=>p.name!==sheriff.name).find(p=>reply.toLowerCase().includes(p.name.toLowerCase()));
+    if (shotTarget && reply.toLowerCase().includes('spar')) {
+      sheriff.hasShot = true;
+      shotTarget.dead = true;
+      sheriff_killed = shotTarget.name;
+      game.deathLog.push(`${shotTarget.name} sparato dallo Sceriffo (notte ${game.night})`);
+      addNarratorSecret(`🔫 Sceriffo (${sheriff.name}) spara a: <strong>${shotTarget.name}</strong> → ❌ MORTO istantaneamente.`);
+      addEvent(`${shotTarget.name} sparato dallo Sceriffo`, 'kill');
+      playSound('kill');
+    } else {
+      addNarratorSecret(`🔫 Sceriffo (${sheriff.name}) decide di aspettare — proiettile ancora disponibile.`);
+    }
+    await sleep(getDelay()*0.4);
   }
 
-  const maxV = Math.max(...Object.values(votes));
-  const top = Object.entries(votes).filter(([_,v])=>v===maxV).map(([n])=>n);
-  const eliminated = top[Math.floor(Math.random()*top.length)];
-  const target = game.players.find(p=>p.name===eliminated);
+  // ── 1. GUARITORE ──────────────────────────────────────
+  if (healer && !healer.dead) {
+    const aliveNow = game.players.filter(p=>!p.dead);
+    setStatus(`${healer.name} (💚 guaritore) sceglie chi proteggere...`);
+    const prevStatement = healer.nightStatement?.trim();
+    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
+    const prompt = `Sei il GUARITORE. Scegli chi proteggere stanotte. Puoi scegliere anche te stesso. ${coherenceCtx} Scegli tra: ${aliveNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+    protected_name = await ask(healer, prompt, aliveNow);
+    addNarratorSecret(`💚 Guaritore (${healer.name}) protegge: <strong>${protected_name}</strong>`);
+    await sleep(getDelay()*0.4);
+  }
 
-  if (target) {
-    target.dead=true;
-    const rmap={wolf:'🐺 un LUPO',seer:'🔮 il Veggente',healer:'💚 il Guaritore',sheriff:'🔫 lo Sceriffo',jester:'🃏 il Matto',villager:'👤 un innocente'};
-    game.deathLog.push(`${target.name} bandito (giorno ${game.night})`);
-    addSystemMsg(`Il verdetto: ${eliminated} viene bandito. Era ${rmap[target.role]}!`);
-    addEvent(`${eliminated} bandito (${target.role==='wolf'?'LUPO!':target.role==='jester'?'MATTO!':'innocente'})`, 'vote');
-    playSound('kill');
+  // ── 2. VEGGENTE ───────────────────────────────────────
+  if (seer && !seer.dead) {
+    const aliveNow = game.players.filter(p=>!p.dead);
+    const targets = aliveNow.filter(p=>p.name!==seer.name);
+    setStatus(`${seer.name} (🔮 veggente) sceglie chi investigare...`);
+    const prevStatement = seer.nightStatement?.trim();
+    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
+    const knownWolves = (seer.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
+    const knownInnocent = (seer.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
+    const unseenTargets = targets.filter(p=>!(seer.seenPlayers||[]).find(s=>s.name===p.name));
+    const seerKnowledge = knownWolves.length
+      ? `Sai già che questi sono LUPI: ${knownWolves.join(', ')}.`
+      : knownInnocent.length ? `Hai già verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
+    const prompt = `Sei il VEGGENTE. ${seerKnowledge} ${coherenceCtx} Scegli chi investigare tra: ${(unseenTargets.length?unseenTargets:targets).map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+    const choice = await ask(seer, prompt, unseenTargets.length?unseenTargets:targets);
+    const target = game.players.find(p=>p.name===choice);
+    if (target) {
+      if (!seer.seenPlayers) seer.seenPlayers=[];
+      if (!seer.seenPlayers.find(s=>s.name===target.name)) {
+        seer.seenPlayers.push({name:target.name, isWolf:target.role==='wolf'});
+      }
+      const roleLabel = target.role==='wolf' ? '🐺 LUPO' : `👤 ${target.role==='seer'?'Veggente':target.role==='healer'?'Guaritore':target.role==='sheriff'?'Sceriffo':target.role==='jester'?'Matto':'Villager'}`;
+      addNarratorSecret(`🔮 Veggente (${seer.name}) investiga: <strong>${target.name}</strong> → ruolo: <strong>${roleLabel}</strong>`);
+    }
+    await sleep(getDelay()*0.4);
+  }
 
-    // Controlla vittoria Matto
-    if (target.role === 'jester') {
-      showWin('jester');
-      return;
+  // ── 3. LUPI ───────────────────────────────────────────
+  const aliveNow = game.players.filter(p=>!p.dead);
+  const wolvesNow = aliveNow.filter(p=>p.role==='wolf');
+  const nonWolvesNow = aliveNow.filter(p=>p.role!=='wolf');
+  if (wolvesNow.length>0 && nonWolvesNow.length>0) {
+    setStatus(`Lupi (${wolvesNow.map(p=>p.name).join(', ')}) scelgono la vittima...`);
+    const wolfAlliesCtx = wolvesNow.length > 1
+      ? `Siete in squadra con: ${wolvesNow.map(p=>p.name).join(', ')}.`
+      : `Sei l'unico lupo rimasto.`;
+    const prevStatement = wolvesNow.map(p=>p.nightStatement?.trim()).filter(Boolean).join(' / ');
+    const coherenceCtx = prevStatement ? `I lupi hanno detto: "${prevStatement}". Sii coerente.` : '';
+    const hasMatto = nonWolvesNow.some(p=>p.role==='jester');
+    const mattoCtx = hasMatto ? ` C'è un Matto in gioco — se viene votato dal villaggio vince lui.` : '';
+    const prompt = `Sei un LUPO. ${wolfAlliesCtx} ${coherenceCtx}${mattoCtx} Scegli chi eliminare stanotte tra: ${nonWolvesNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
+    killed_name = await ask(wolvesNow[0], prompt, nonWolvesNow);
+
+    if (killed_name === protected_name) {
+      addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ✅ SALVATO dal Guaritore!`);
+      addEvent(`${killed_name} salvato dal Guaritore`, 'night');
+      playSound('save');
+      const healerPlayer = game.players.find(p=>p.role==='healer'&&!p.dead);
+      if (healerPlayer) healerPlayer.lastSaved = killed_name;
+      killed_name = null;
+    } else {
+      const victim = game.players.find(p=>p.name===killed_name);
+      if (victim && !victim.dead) {
+        const protectedInfo = protected_name ? `Il Guaritore proteggeva ${protected_name}.` : 'Nessun Guaritore.';
+        addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ❌ ${protectedInfo} <strong>${killed_name} morirà all'alba.</strong>`);
+        victim.dead = true;
+        game.deathLog.push(`${victim.name} ucciso dai lupi (notte ${game.night})`);
+        addEvent(`${victim.name} eliminato dai lupi`, 'kill');
+        playSound('kill');
+      }
     }
   }
 
-  // Salva riassunto del giorno nella memoria storica
-  game.dayHistory.push({
-    dayNum: game.night,
-    statements: discussionHistory.map(s => ({ name: s.name, text: s.text.slice(0, 120) })),
-    eliminated: eliminated || null,
-    eliminatedRole: target ? target.role : null,
-  });
-
-  updatePlayersList(); updateStats();
+  await sleep(getDelay()*0.5);
+  return { killed: killed_name, sheriffKilled: sheriff_killed };
 }
 
 function stopGame() {
@@ -1541,6 +1994,153 @@ function showWin(winner) {
   btn.disabled=false; btn.textContent='Nuova Partita';
 }
 
+async function runDay(nightResult) {
+  const killed = typeof nightResult === 'object' ? nightResult?.killed : nightResult;
+  const sheriffKilled = typeof nightResult === 'object' ? nightResult?.sheriffKilled : null;
+
+  game.phase = 'day';
+  setPhase(`Giorno ${game.night}`, 'day');
+  showDayFlash();
+  playSound('day');
+  await sleep(500);
+  addSep(`— GIORNO ${game.night} —`);
+  updateSuggestions();
+  updateNarratorTargets();
+
+  // Annunci morti della notte
+  if (sheriffKilled) {
+    addSystemMsg(`🔫 Nella notte lo Sceriffo ha sparato: ${sheriffKilled} è stato ucciso!`);
+    addEvent(`${sheriffKilled} sparato dallo Sceriffo`, 'kill');
+  }
+  if (killed) {
+    addSystemMsg(`L'alba porta una notizia tragica: ${killed} non c'è più. Il villaggio si riunisce.`);
+    addEvent(`${killed} trovato eliminato`, 'kill');
+  }
+  if (!killed && !sheriffKilled) {
+    addSystemMsg(`Nessuno è morto stanotte. I lupi sono ancora tra noi.`);
+  }
+  await sleep(getDelay()*0.5);
+
+  const commonStrategies = `Strategie disponibili (usale senza dichiararle esplicitamente): Accountability Framework, Graveyard Analysis, Pattern di voto su tutti i giorni, Accusare i silenziosi, Rules Lawyering, Behavioral Analysis, LYLO Awareness, Silenzio strategico, Redemption Arc.`;
+
+  const discussionHistory = [];
+
+  for (let round = 1; round <= 3; round++) {
+    addSep(`— DISCUSSIONE — turno ${round}/3`);
+    const aliveCurrent = game.players.filter(p=>!p.dead);
+
+    for (let i = 0; i < aliveCurrent.length; i++) {
+      const p = aliveCurrent[i];
+      if (!isRunning) return;
+      await waitIfPaused();
+
+      const alreadySpoke = aliveCurrent.slice(0,i).map(x=>x.name);
+      const yetToSpeak = aliveCurrent.slice(i+1).map(x=>x.name);
+      const orderCtx = round===1
+        ? ` ${alreadySpoke.length ? `Hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio ancora.` : 'Sei l\'ultimo a parlare.'}`
+        : '';
+
+      const historyCtx = discussionHistory.length > 0
+        ? `\n\nEcco cosa è stato detto finora:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
+        : '';
+
+      const baseCtx = round===1
+        ? (killed||sheriffKilled
+            ? `È giorno ${game.night}. Stanotte ${[sheriffKilled,killed].filter(Boolean).join(' e ')} ${sheriffKilled&&killed?'sono stati eliminati':' è stato eliminato'}. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
+            : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
+        : round===2
+        ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti.`
+        : `Turno 3. Continua il dibattito, porta nuovi argomenti o rafforza i tuoi. Non devi ancora dichiarare il voto.`;
+
+      const ctx = `${baseCtx}${orderCtx}${historyCtx}\n\nParla direttamente in personaggio — non analizzare ad alta voce, vai dritto al punto.`;
+
+      showThinking(p);
+      setStatus(`${p.name} parla (turno ${round}/3)...`);
+      const reply = await ask(p, ctx);
+      removeThinking();
+      addMsg(p, reply, 'day');
+      discussionHistory.push({name: p.name, text: reply});
+
+      // ── DIRITTO DI REPLICA ──
+      const accusedPlayers = aliveCurrent.filter(accused =>
+        accused.name !== p.name &&
+        reply.toLowerCase().includes(accused.name.toLowerCase())
+      );
+      for (const accused of accusedPlayers) {
+        if (!isRunning) break;
+        await waitIfPaused();
+        await sleep(getDelay()*0.5);
+        showThinking(accused);
+        setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
+        const replyCtx = `${p.name} ha appena parlato di te: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi. La tua risposta non dà diritto ad ulteriori repliche.${historyCtx}`;
+        const replyMsg = await ask(accused, replyCtx);
+        removeThinking();
+        addMsg(accused, replyMsg, 'day');
+        discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
+        await sleep(getDelay()*0.8);
+      }
+
+      await sleep(getDelay()*1.2);
+    }
+    if (round < 3) await sleep(getDelay()*0.5);
+  }
+
+  addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
+  setStatus('In attesa del narratore...');
+  await waitForAdvance('🗳️ Avanza al voto');
+  await waitIfPaused();
+
+  addSep('— VOTAZIONE —');
+  addSystemMsg('Il villaggio vota chi bandire.');
+  updateSuggestions();
+  await sleep(getDelay()*0.5);
+
+  const votes = {};
+  const aliveFinal = game.players.filter(p=>!p.dead);
+  for (const p of aliveFinal) votes[p.name]=0;
+
+  const voteSummary = discussionHistory.length>0
+    ? `\n\nRiassunto discussione:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
+    : '';
+
+  for (const voter of aliveFinal) {
+    if (!isRunning) return;
+    await waitIfPaused();
+    const candidates = aliveFinal.filter(p=>p.name!==voter.name);
+    showThinking(voter);
+    setStatus(`${voter.name} vota...`);
+    const choice = await ask(voter, `È il momento del voto. Basandoti sulla discussione, dichiara in una frase chi vuoi eliminare e perché, poi indica il nome esatto.${voter.role==='wolf'?' Giustifica il voto con argomenti da cittadino innocente.':voter.role==='jester'?' Ricorda: devi farti eliminare tu.':''}${voteSummary}`, candidates);
+    removeThinking();
+    if (votes[choice]!==undefined) votes[choice]++;
+    addMsg(voter, choice, 'vote');
+    await sleep(getDelay()*1.0);
+  }
+
+  const maxV = Math.max(...Object.values(votes));
+  const top = Object.entries(votes).filter(([_,v])=>v===maxV).map(([n])=>n);
+  const eliminated = top[Math.floor(Math.random()*top.length)];
+  const target = game.players.find(p=>p.name===eliminated);
+
+  if (target) {
+    target.dead=true;
+    const rmap={wolf:'🐺 un LUPO',seer:'🔮 il Veggente',healer:'💚 il Guaritore',sheriff:'🔫 lo Sceriffo',jester:'🃏 il Matto',villager:'👤 un innocente'};
+    game.deathLog.push(`${target.name} bandito (giorno ${game.night})`);
+    addSystemMsg(`Il verdetto: ${eliminated} viene bandito. Era ${rmap[target.role]}!`);
+    addEvent(`${eliminated} bandito (${target.role==='wolf'?'LUPO!':target.role==='jester'?'MATTO!':'innocente'})`, 'vote');
+    playSound('kill');
+    if (target.role === 'jester') { showWin('jester'); return; }
+  }
+
+  game.dayHistory.push({
+    dayNum: game.night,
+    statements: discussionHistory.map(s => ({ name: s.name, text: s.text.slice(0, 120) })),
+    eliminated: eliminated || null,
+    eliminatedRole: target ? target.role : null,
+  });
+
+  updatePlayersList(); updateStats();
+}
+
 async function runGame() {
   while (isRunning) {
     const nightResult = await runNight();
@@ -1571,19 +2171,17 @@ function startGame() {
   document.getElementById('pause-btn').textContent='⏸ Pausa';
   document.getElementById('pause-btn').classList.remove('paused');
   const n = parseInt(document.getElementById('num-players-select').value);
-  const aiCount = n;game = {
+  const aiCount = n;
+  const allModels = buildUnifiedModels();
+  game = {
     players: PLAYER_SLOTS.slice(0, aiCount).map((slot,i)=>{
-      const a=getAssignment(i)||opts[i%opts.length];
-      const provider=PROVIDERS.find(p=>p.id===a.providerId);
-      const modelObj=provider?.models.find(m=>m.id===a.modelId);
-      const modelLabel=modelObj?.label||a.modelId;
-      const providerName=provider?.name||a.providerId;
+      const modelKey = getAssignment(i);
+      const modelEntry = allModels.find(m=>m.key===modelKey) || allModels[i%allModels.length];
       return {
         ...slot,
-        name: modelLabel,
-        providerLabel: `${providerName} · ${modelLabel}`,
-        providerId: a.providerId,
-        modelId: a.modelId,
+        name: modelEntry.label,
+        providerLabel: modelEntry.label,
+        modelKey: modelEntry.key,
         bg: BG_COLORS[i%BG_COLORS.length],
         dead: false, role: null, seenPlayers: [],
       };
