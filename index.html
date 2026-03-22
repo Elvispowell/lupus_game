@@ -256,12 +256,6 @@
       </div>
       <span style="font-size:0.62rem;color:var(--text-faint);font-family:var(--font-mono,monospace)">il resto sarà villager</span>
     </div>
-    <div style="margin-top:0.9rem;display:flex;align-items:center;gap:0.5rem">
-      <input type="checkbox" id="player-mode" style="cursor:pointer">
-      <label for="player-mode" style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif">
-        👤 Gioca come player — sei contato nel numero di giocatori, ricevi un ruolo casuale
-      </label>
-    </div>
   </div>
 </div>
 
@@ -273,15 +267,6 @@
 
   <div id="chat-area">
     <div id="chat-log"></div>
-
-    <!-- PLAYER INPUT (solo in modalità player, quando è il tuo turno) -->
-    <div id="player-input-area" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.75rem;margin:0.5rem 0.75rem;">
-      <div style="font-size:0.7rem;color:#1e40af;font-family:'DM Mono',monospace;margin-bottom:0.4rem" id="player-input-label">💬 È il tuo turno — scrivi il tuo messaggio</div>
-      <div style="display:flex;gap:0.5rem">
-        <input type="text" id="player-input" placeholder="Scrivi qui..." style="flex:1;padding:0.4rem 0.7rem;border:1px solid #bfdbfe;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.8rem;outline:none" />
-        <button id="player-send-btn" style="padding:0.4rem 1rem;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.75rem;font-weight:500">Invia</button>
-      </div>
-    </div>
 
     <!-- NARRATOR BAR -->
     <div id="narrator-bar">
@@ -359,6 +344,7 @@ const PROVIDERS = [
       { id: 'qwen/qwen3-32b',                 label: 'Qwen3 32B' },
       { id: 'openai/gpt-oss-120b',            label: 'GPT-OSS 120B' },
       { id: 'openai/gpt-oss-20b',             label: 'GPT-OSS 20B' },
+      { id: 'meta-llama/llama-4-scout-17b-16e-instruct', label: 'LLaMA 4 Scout' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -380,7 +366,7 @@ const PROVIDERS = [
     models: [
       { id: 'llama3.1-8b',                       label: 'LLaMA 3.1 8B' },
       { id: 'gpt-oss-120b',                       label: 'GPT-OSS 120B' },
-      { id: 'zai-glm-4.7',                        label: 'GLM 4.7 (355B)' },
+      { id: 'zai-glm-4.7',                        label: 'GLM-4.7' },
       { id: 'qwen-3-235b-a22b-instruct-2507',     label: 'Qwen3 235B' },
     ],
     call: async (key, model, sys, usr) => {
@@ -402,8 +388,10 @@ const PROVIDERS = [
     limit: '300k token/g',
     models: [
       { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
-      { id: 'gemini-2.5-flash',                    label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-pro',                      label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-3-flash',        label: 'Gemini 3 Flash' },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
@@ -434,8 +422,12 @@ const PROVIDERS = [
       { id: 'DeepSeek-R1-0528',                    label: 'DeepSeek R1' },
       { id: 'DeepSeek-V3-0324',                    label: 'DeepSeek V3' },
       { id: 'DeepSeek-V3.1',                       label: 'DeepSeek V3.1' },
-      { id: 'DeepSeek-R1-Distill-Llama-70B',       label: 'DeepSeek R1 Distill 70B' },
+      { id: 'DeepSeek-V3.1-Terminus',              label: 'DeepSeek V3.1 Terminus' },
+      { id: 'DeepSeek-V3.2',                       label: 'DeepSeek V3.2' },
+      { id: 'DeepSeek-R1-Distill-Llama-70B',       label: 'DeepSeek R1 Distill LLaMA' },
       { id: 'gpt-oss-120b',                        label: 'GPT-OSS 120B' },
+      { id: 'Llama-3.3-Swallow-70B-Instruct-v0.4', label: 'LLaMA 3.3 Swallow 70B' },
+      { id: 'MiniMax-M2.5',                        label: 'MiniMax M2.5' },
       { id: 'Qwen3-235B-A22B-Instruct-2507',       label: 'Qwen3 235B' },
       { id: 'Qwen3-32B',                           label: 'Qwen3 32B' },
       { id: 'Llama-4-Maverick-17B-128E-Instruct',  label: 'LLaMA 4 Maverick' },
@@ -477,6 +469,31 @@ const PROVIDERS = [
     }
   },
   {
+    id: 'huggingface', name: 'Hugging Face', color: '#ff9d00',
+    placeholder: 'hf_...', validate: k => k.startsWith('hf_') && k.length > 10,
+    limit: 'free tier',
+    models: [
+      { id: 'meta-llama/Llama-3.1-8B-Instruct',   label: 'LLaMA 3.1 8B' },
+      { id: 'meta-llama/Llama-3.2-1B-Instruct',   label: 'LLaMA 3.2 1B' },
+      { id: 'Qwen/Qwen3-8B',                       label: 'Qwen3 8B' },
+      { id: 'Qwen/QwQ-32B',                        label: 'Qwen 3.5 9B' },
+      { id: 'mistralai/Mistral-7B-Instruct-v0.3',  label: 'Mistral 7B' },
+      { id: 'tiiuae/falcon-7b-instruct',           label: 'Falcon 7B' },
+    ],
+    call: async (key, model, sys, usr) => {
+      const r = await fetch('https://router.huggingface.co/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
+        body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
+          messages:[{role:'system',content:sys},{role:'user',content:usr}] })
+      });
+      if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${r.status}`); }
+      const d = await r.json();
+      const t = d?.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Risposta vuota');
+      return t.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    }
+  },
+  {
     id: 'ai21', name: 'AI21 Labs', color: '#6366f1',
     placeholder: 'key AI21...', validate: k => k.length > 15,
     limit: '$10 crediti iniziali',
@@ -504,14 +521,10 @@ const PROVIDERS = [
     placeholder: 'ghp_... o github_pat_...', validate: k => (k.startsWith('ghp_')||k.startsWith('github_pat_')) && k.length > 20,
     limit: '50 req/g grandi',
     models: [
-      { id: 'openai/gpt-4o',                                    label: 'GPT-4o' },
-      { id: 'openai/gpt-4o-mini',                               label: 'GPT-4o Mini' },
       { id: 'openai/gpt-4.1',                                   label: 'GPT-4.1' },
       { id: 'openai/gpt-4.1-mini',                              label: 'GPT-4.1 Mini' },
-      { id: 'openai/gpt-4.1-nano',                              label: 'GPT-4.1 Nano' },
-      { id: 'openai/gpt-5',                                     label: 'GPT-5' },
-      { id: 'openai/gpt-5-mini',                                label: 'GPT-5 Mini' },
-      { id: 'openai/gpt-5-nano',                                label: 'GPT-5 Nano' },
+      { id: 'openai/gpt-4o',                                    label: 'GPT-4o' },
+      { id: 'openai/gpt-4o-mini',                               label: 'GPT-4o Mini' },
       { id: 'xai/grok-3',                                       label: 'Grok 3' },
       { id: 'xai/grok-3-mini',                                  label: 'Grok 3 Mini' },
       { id: 'meta/llama-3.3-70b-instruct',                      label: 'LLaMA 3.3 70B' },
@@ -519,19 +532,17 @@ const PROVIDERS = [
       { id: 'meta/llama-4-scout-17b-16e-instruct',              label: 'LLaMA 4 Scout' },
       { id: 'meta/meta-llama-3.1-405b-instruct',                label: 'LLaMA 3.1 405B' },
       { id: 'meta/meta-llama-3.1-8b-instruct',                  label: 'LLaMA 3.1 8B' },
+      { id: 'meta/meta-llama-3.2-11b-vision-instruct',          label: 'LLaMA 3.2 11B' },
       { id: 'deepseek/deepseek-v3-0324',                        label: 'DeepSeek V3' },
       { id: 'deepseek/deepseek-r1',                             label: 'DeepSeek R1' },
-      { id: 'mistral-ai/mistral-small-2503',                    label: 'Mistral Small 3.1' },
-      { id: 'mistral-ai/mistral-medium-2505',                   label: 'Mistral Medium 3' },
-      { id: 'mistral-ai/ministral-3b',                          label: 'Ministral 3B' },
+      { id: 'mistral-ai/mistral-small-2503',                    label: 'Mistral Small' },
+      { id: 'mistral-ai/mistral-medium-2505',                   label: 'Mistral Medium' },
+      { id: 'mistral-ai/codestral-2501',                        label: 'Codestral 25' },
       { id: 'microsoft/phi-4',                                  label: 'Phi-4' },
       { id: 'microsoft/phi-4-mini-instruct',                    label: 'Phi-4 Mini' },
-      { id: 'microsoft/phi-4-reasoning',                        label: 'Phi-4 Reasoning' },
-      { id: 'microsoft/phi-4-mini-reasoning',                   label: 'Phi-4 Mini Reasoning' },
-      { id: 'microsoft/mai-ds-r1',                              label: 'MAI-DS-R1' },
       { id: 'ai21-labs/ai21-jamba-1.5-large',                   label: 'Jamba 1.5 Large' },
-      { id: 'cohere/cohere-command-a',                          label: 'Command A' },
       { id: 'cohere/cohere-command-r-plus-08-2024',             label: 'Command R+' },
+      { id: 'cohere/cohere-command-r-08-2024',                  label: 'Command R' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('https://models.github.ai/inference/chat/completions', {
@@ -559,8 +570,6 @@ const PROVIDERS = [
       { id: 'mistral-small-latest',   label: 'Mistral Small' },
       { id: 'mistral-medium-latest',  label: 'Mistral Medium' },
       { id: 'mistral-large-latest',   label: 'Mistral Large' },
-      { id: 'open-mistral-nemo',      label: 'Mistral Nemo' },
-      { id: 'codestral-latest',       label: 'Codestral' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
@@ -587,7 +596,6 @@ const PROVIDERS = [
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('https://api.cohere.com/v2/chat', {
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key.trim()}`},
         body: JSON.stringify({ model, max_tokens:180, temperature:0.88,
           messages:[{role:'system',content:sys},{role:'user',content:usr}] })
       });
@@ -667,11 +675,17 @@ const PROVIDERS = [
     placeholder: '(key sul server — lascia vuoto)', validate: k => true,
     limit: '10k neuroni/g', serverSide: true,
     models: [
-      { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',      label: 'LLaMA 3.3 70B' },
-      { id: '@cf/nvidia/llama-3.1-nemotron-70b-instruct',    label: 'Nemotron 70B' },
-      { id: '@cf/meta/llama-3.1-8b-instruct',                label: 'LLaMA 3.1 8B' },
-      { id: '@cf/google/gemma-3-12b-it',                     label: 'Gemma 3 12B' },
-      { id: '@cf/mistral/mistral-7b-instruct-v0.2',          label: 'Mistral 7B' },
+      { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',            label: 'LLaMA 3.3 70B Fast' },
+      { id: '@cf/meta/llama-4-scout-17b-16e-instruct',             label: 'LLaMA 4 Scout' },
+      { id: '@cf/openai/gpt-oss-120b',                             label: 'GPT-OSS 120B' },
+      { id: '@cf/openai/gpt-oss-20b',                              label: 'GPT-OSS 20B' },
+      { id: '@cf/moonshotai/kimi-k2-5',                            label: 'Kimi K2.5' },
+      { id: '@cf/z-ai/glm-4-7-flash',                              label: 'GLM-4.7 Flash' },
+      { id: '@cf/nvidia/nemotron-3-120b-a12b',                     label: 'Nemotron 3 120B' },
+      { id: '@cf/qwen/qwen3-30b-a3b-fp8',                          label: 'Qwen3 30B' },
+      { id: '@cf/mistralai/mistral-small-3.1-24b-instruct',        label: 'Mistral Small 3.1' },
+      { id: '@cf/ibm/granite-4.0-tiny',                            label: 'Granite 4.0 Micro' },
+      { id: '@cf/nousresearch/hermes-2-pro-mistral-7b',            label: 'Hermes 2 Pro 7B' },
     ],
     call: async (key, model, sys, usr) => {
       const r = await fetch('/api/cloudflare', {
@@ -891,10 +905,9 @@ function addSep(text) {
 function addMsg(player, text, tag='', secret=false) {
   const log = document.getElementById('chat-log');
   const wrap = document.createElement('div');
-  wrap.className = 'msg' + (secret ? ' secret' : '') + (player.isHuman ? ' human-msg' : '');
+  wrap.className = 'msg' + (secret ? ' secret' : '');
   const tagHTML = tag ? `<span class="msg-tag tag-${tag}">${tag}</span>` : '';
   const secretBadge = secret ? `<span class="msg-badge" style="background:#eef2ff;color:#6366f1;border-color:#c7d2fe">🔒 segreto</span>` : '';
-  const humanBadge = player.isHuman ? `<span class="msg-badge" style="background:#fef3c7;color:#92400e;border-color:#fde68a">👤 tu</span>` : '';
   const hintHTML = secret ? `<div class="secret-hint">clicca per rivelare</div>` : '';
   wrap.innerHTML = `
     <div class="msg-avatar" style="background:${player.bg||'#f0ede6'}">${player.emoji}</div>
@@ -902,7 +915,7 @@ function addMsg(player, text, tag='', secret=false) {
       <div class="msg-header">
         <span class="msg-name">${player.name}</span>
         <span class="msg-badge">${player.providerLabel}</span>
-        ${humanBadge}
+        
         ${secretBadge}
         <span class="msg-time">${timeStr()}</span>
         ${tagHTML}
@@ -961,11 +974,11 @@ function updatePlayersList() {
     const showRole = p.dead || game.gameOver;
     const roleLabel = showRole ? (roleMap[p.role]||p.role) : '— ruolo segreto';
     const stClass = p.dead ? 'status-dead' : (game.gameOver&&p.role==='wolf' ? 'status-wolf' : 'status-alive');
-    const stText = p.dead ? 'eliminato' : (game.gameOver&&p.role==='wolf' ? 'lupo!' : p.isHuman ? '👤 tu' : 'in vita');
+    const stText = p.dead ? 'eliminato' : (game.gameOver&&p.role==='wolf' ? 'lupo!' : 'in vita');
     card.innerHTML = `
       <div class="avatar" style="background:${p.bg||'#f0ede6'}">${p.emoji}</div>
       <div class="player-info">
-        <div class="player-name">${p.name}${p.isHuman?' 👤':''}</div>
+        <div class="player-name">${p.name}</div>
         <div class="player-meta">${p.providerLabel}</div>
         <div class="player-role-label">${roleLabel}</div>
       </div>
@@ -1116,67 +1129,6 @@ async function askRoleDirectly(targetNames, message) {
 // ═══════════════════════════════════════════════════════
 // PLAYER MODE
 // ═══════════════════════════════════════════════════════
-function isPlayerMode() {
-  return document.getElementById('player-mode')?.checked && game?.humanPlayer;
-}
-
-function waitForPlayerInput(label) {
-  return new Promise(resolve => {
-    const area = document.getElementById('player-input-area');
-    const input = document.getElementById('player-input');
-    const btn = document.getElementById('player-send-btn');
-    const labelEl = document.getElementById('player-input-label');
-    labelEl.textContent = label;
-    area.style.display = 'block';
-    input.value = '';
-    input.focus();
-    area.scrollIntoView({behavior:'smooth'});
-
-    const submit = () => {
-      const val = input.value.trim();
-      if (!val) return;
-      area.style.display = 'none';
-      input.removeEventListener('keydown', onKey);
-      btn.removeEventListener('click', submit);
-      resolve(val);
-    };
-    const onKey = e => { if (e.key === 'Enter') submit(); };
-    input.addEventListener('keydown', onKey);
-    btn.addEventListener('click', submit);
-  });
-}
-
-function waitForPlayerChoice(label, options) {
-  return new Promise(resolve => {
-    const area = document.getElementById('player-input-area');
-    const labelEl = document.getElementById('player-input-label');
-    labelEl.textContent = label;
-
-    // Crea bottoni per le scelte
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.4rem';
-    options.forEach(opt => {
-      const b = document.createElement('button');
-      b.textContent = opt;
-      b.style.cssText = 'padding:0.3rem 0.7rem;background:#fff;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;font-size:0.75rem;font-family:\'DM Sans\',sans-serif';
-      b.onclick = () => {
-        btnRow.remove();
-        document.getElementById('player-input').style.display = 'block';
-        document.getElementById('player-send-btn').style.display = 'block';
-        area.style.display = 'none';
-        resolve(opt);
-      };
-      btnRow.appendChild(b);
-    });
-
-    document.getElementById('player-input').style.display = 'none';
-    document.getElementById('player-send-btn').style.display = 'none';
-    area.appendChild(btnRow);
-    area.style.display = 'block';
-    area.scrollIntoView({behavior:'smooth'});
-  });
-}
-
 
 async function waitIfPaused() {
   if (!isPaused) return;
@@ -1329,7 +1281,6 @@ function buildHistoryCtx(player) {
 }
 
 async function ask(player, prompt, candidates=null) {
-  if (player.isHuman) return ''; // il giocatore umano è gestito separatamente
   try {
     await waitIfPaused();
     const reply = await callProvider(player, buildSysPrompt(player), prompt);
@@ -1466,384 +1417,10 @@ async function runNight() {
   playSound('night');
 
   addSystemMsg(`🌙 Notte ${game.night} — Ruoli attivi: ${rolesAlive.join(', ')}. Interrogali nell'ordine suggerito poi premi "Avanza verso l'alba".`);
+  setStatus('In attesa del narratore...');  addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
   setStatus('In attesa del narratore...');
-
-  // In modalità player la notte avanza automaticamente
-  if (!game.humanPlayer) {
-    await waitForAdvance('☀️ Avanza verso l\'alba');
-    await waitIfPaused();
-  } else {
-    await sleep(getDelay());
-  }
-
-  let protected_name = null;
-  let killed_name = null;
-  let sheriff_killed = null;
-
-  // ── 0. SCERIFFO (solo se vivo e ha ancora il proiettile) ──
-  if (sheriff) {
-    setStatus(`${sheriff.name} (🔫 sceriffo) decide se sparare...`);
-    const prevStatement = sheriff.nightStatement?.trim();
-    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente.` : '';
-    const prompt = `Sei lo SCERIFFO. Hai UN proiettile per tutta la partita. Puoi scegliere di sparare stanotte oppure aspettare. ${coherenceCtx} Se vuoi sparare, di' "sparo a [nome]". Se vuoi aspettare, di' "aspetto". Giocatori vivi: ${names}. Ragiona strategicamente — rivelare il tuo ruolo ti mette in pericolo.`;
-    const reply = await ask(sheriff, prompt);
-    // Cerca un nome nella risposta — se trovato, spara
-    const shotTarget = alive.filter(p=>p.name!==sheriff.name).find(p=>reply.toLowerCase().includes(p.name.toLowerCase()));
-    if (shotTarget && reply.toLowerCase().includes('spar')) {
-      sheriff.hasShot = true;
-      shotTarget.dead = true;
-      sheriff_killed = shotTarget.name;
-      game.deathLog.push(`${shotTarget.name} sparato dallo Sceriffo (notte ${game.night})`);
-      addNarratorSecret(`🔫 Sceriffo (${sheriff.name}) spara a: <strong>${shotTarget.name}</strong> → ❌ MORTO istantaneamente.`);
-      addEvent(`${shotTarget.name} sparato dallo Sceriffo`, 'kill');
-      playSound('kill');
-    } else {
-      addNarratorSecret(`🔫 Sceriffo (${sheriff.name}) decide di aspettare — proiettile ancora disponibile.`);
-    }
-    await sleep(getDelay()*0.4);
-  }
-
-  // ── 1. GUARITORE (solo se vivo) ───────────────────────
-  if (healer && !healer.dead) {
-    const aliveNow = game.players.filter(p=>!p.dead);
-    setStatus(`${healer.name} (💚 guaritore) sceglie chi proteggere...`);
-    const prevStatement = healer.nightStatement?.trim();
-    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.` : '';
-    const prompt = `Sei il GUARITORE. Devi scegliere chi proteggere stanotte. Puoi scegliere anche te stesso. ${coherenceCtx} Scegli tra: ${aliveNow.map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
-    protected_name = await ask(healer, prompt, aliveNow);
-    addNarratorSecret(`💚 Guaritore (${healer.name}) protegge: <strong>${protected_name}</strong>`);
-    await sleep(getDelay()*0.4);
-  }
-
-  // ── 2. VEGGENTE (solo se vivo) ────────────────────────
-  if (seer && !seer.dead) {
-    const aliveNow = game.players.filter(p=>!p.dead);
-    const targets = aliveNow.filter(p=>p.name!==seer.name);
-    setStatus(`${seer.name} (🔮 veggente) sceglie chi investigare...`);
-    const prevStatement = seer.nightStatement?.trim();
-    const coherenceCtx = prevStatement ? `Hai già detto al narratore: "${prevStatement}". Sii coerente con questa dichiarazione.` : '';
-    const knownWolves = (seer.seenPlayers||[]).filter(s=>s.isWolf).map(s=>s.name);
-    const knownInnocent = (seer.seenPlayers||[]).filter(s=>!s.isWolf).map(s=>s.name);
-    const unseenTargets = targets.filter(p=>!(seer.seenPlayers||[]).find(s=>s.name===p.name));
-    const seerKnowledge = knownWolves.length
-      ? `Sai già che questi sono LUPI: ${knownWolves.join(', ')}. Considera se rivelare questa info al villaggio o tenerla segreta per non farti eliminare.`
-      : knownInnocent.length ? `Hai già verificato che questi sono innocenti: ${knownInnocent.join(', ')}.` : '';
-    const prompt = `Sei il VEGGENTE. ${seerKnowledge} ${coherenceCtx} Scegli chi investigare tra: ${(unseenTargets.length?unseenTargets:targets).map(p=>p.name).join(', ')}. Rispondi SOLO con il nome esatto.`;
-    const choice = await ask(seer, prompt, unseenTargets.length?unseenTargets:targets);
-    const target = game.players.find(p=>p.name===choice);
-    if (target) {
-      if (!seer.seenPlayers) seer.seenPlayers=[];
-      if (!seer.seenPlayers.find(s=>s.name===target.name)) {
-        seer.seenPlayers.push({name:target.name, isWolf:target.role==='wolf'});
-      }
-      const roleLabel = target.role==='wolf' ? '🐺 LUPO' : `👤 ${target.role==='seer'?'Veggente':target.role==='healer'?'Guaritore':target.role==='sheriff'?'Sceriffo':target.role==='jester'?'Matto':'Villager'}`;
-      addNarratorSecret(`🔮 Veggente (${seer.name}) investiga: <strong>${target.name}</strong> → ruolo: <strong>${roleLabel}</strong>`);
-    }
-    await sleep(getDelay()*0.4);
-  }
-
-  // ── 3. LUPI (solo se vivi) ────────────────────────────
-  const aliveNow = game.players.filter(p=>!p.dead);
-  const wolvesNow = aliveNow.filter(p=>p.role==='wolf');
-  const nonWolvesNow = aliveNow.filter(p=>p.role!=='wolf');
-  if (wolvesNow.length>0 && nonWolvesNow.length>0) {
-    setStatus(`Lupi (${wolvesNow.map(p=>p.name).join(', ')}) scelgono la vittima...`);
-    const wolfAlliesCtx = wolvesNow.length > 1
-      ? `Siete in squadra con: ${wolvesNow.map(p=>p.name).join(', ')}. Coordinate la scelta per eliminare il bersaglio più pericoloso.`
-      : `Sei l'unico lupo rimasto.`;
-    const prevStatement = wolvesNow.map(p=>p.nightStatement?.trim()).filter(Boolean).join(' / ');
-    const coherenceCtx = prevStatement ? `Il lupo/i lupi hanno detto al narratore: "${prevStatement}". La scelta deve essere coerente.` : '';
-    const hasMatto = nonWolvesNow.some(p=>p.role==='jester');
-    const mattoCtx = hasMatto ? ` ATTENZIONE: c'è un Matto in gioco — se viene votato dal villaggio vince lui. Considera se conviene lasciarlo vivo per confondere il villaggio.` : '';
-    const prompt = `Sei un LUPO. ${wolfAlliesCtx} ${coherenceCtx}${mattoCtx} Scegli chi eliminare stanotte tra: ${nonWolvesNow.map(p=>p.name).join(', ')}. Scegli il bersaglio più pericoloso (veggente, guaritore, sceriffo, o chi vi sospetta). Rispondi SOLO con il nome esatto.`;
-    killed_name = await ask(wolvesNow[0], prompt, nonWolvesNow);
-
-    if (killed_name === protected_name) {
-      addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ✅ SALVATO dal Guaritore! Nessuno muore stanotte.`);
-      addEvent(`${killed_name} salvato dal Guaritore`, 'night');
-      playSound('save');
-      // Il guaritore sa di aver salvato qualcuno
-      const healerPlayer = game.players.find(p=>p.role==='healer'&&!p.dead);
-      if (healerPlayer) healerPlayer.lastSaved = killed_name;
-      killed_name = null;
-    } else {
-      const victim = game.players.find(p=>p.name===killed_name);
-      if (victim && !victim.dead) {
-        const protectedInfo = protected_name
-          ? `Il Guaritore proteggeva ${protected_name}, non ${killed_name}.`
-          : 'Nessun Guaritore in campo.';
-        addNarratorSecret(`🐺 Lupi scelgono: <strong>${killed_name}</strong> → ❌ ${protectedInfo} <strong>${killed_name} morirà all'alba.</strong>`);
-        victim.dead = true;
-        game.deathLog.push(`${victim.name} ucciso dai lupi (notte ${game.night})`);
-        addEvent(`${victim.name} eliminato dai lupi`, 'kill');
-        playSound('kill');
-      }
-    }
-  }
-
-  await sleep(getDelay()*0.5);
-
-  // ── GIOCATORE UMANO (notte) ───────────────────────────
-  const human = game.humanPlayer;
-  if (human && !human.dead) {
-    if (human.role === 'wolf') {
-      // Mostra i messaggi dei compagni lupi
-      const wolfAllies = game.players.filter(p=>p.role==='wolf'&&!p.dead&&!p.isHuman);
-      if (wolfAllies.length) {
-        addHumanSecret(`🐺 I tuoi compagni lupi: <strong>${wolfAllies.map(p=>p.name).join(', ')}</strong>`);
-        // Mostra cosa hanno detto i lupi AI stanotte
-        wolfAllies.forEach(ally => {
-          if (ally.nightStatement) addHumanSecret(`🐺 ${ally.name} ha detto: "${ally.nightStatement}"`);
-        });
-      }
-      // Annulla la scelta dei lupi AI e lascia decidere l'umano
-      if (killed_name) {
-        const prevVictim = game.players.find(p=>p.name===killed_name);
-        if (prevVictim) { prevVictim.dead = false; }
-        killed_name = null;
-      }
-      const nonWolvesNow2 = game.players.filter(p=>!p.dead&&p.role!=='wolf');
-      if (nonWolvesNow2.length) {
-        const choiceStr = await waitForPlayerChoice(
-          `🐺 Sei il LUPO — scegli chi eliminare stanotte`,
-          nonWolvesNow2.map(p=>p.name)
-        );
-        const newVictim = game.players.find(p=>p.name===choiceStr);
-        if (newVictim && newVictim.name !== protected_name) {
-          newVictim.dead = true;
-          killed_name = newVictim.name;
-          game.deathLog.push(`${newVictim.name} ucciso dai lupi (notte ${game.night})`);
-          addHumanSecret(`🐺 Hai scelto di eliminare: <strong>${newVictim.name}</strong>`);
-        } else if (newVictim && newVictim.name === protected_name) {
-          killed_name = null;
-          addHumanSecret(`🐺 Hai scelto ${choiceStr} ma il Guaritore lo proteggeva — ✅ SALVATO!`);
-        }
-      }
-    } else if (human.role === 'seer') {
-      const targets2 = game.players.filter(p=>!p.dead&&p.name!==human.name);
-      const unseen = targets2.filter(p=>!(human.seenPlayers||[]).find(s=>s.name===p.name));
-      const pool = unseen.length ? unseen : targets2;
-      const choiceStr = await waitForPlayerChoice(
-        `🔮 Sei il VEGGENTE — scegli chi investigare`,
-        pool.map(p=>p.name)
-      );
-      const target2 = game.players.find(p=>p.name===choiceStr);
-      if (target2) {
-        if (!human.seenPlayers) human.seenPlayers=[];
-        if (!human.seenPlayers.find(s=>s.name===target2.name)) {
-          human.seenPlayers.push({name:target2.name, isWolf:target2.role==='wolf'});
-        }
-        const roleLabel2 = target2.role==='wolf' ? '🐺 LUPO' : `👤 ${target2.role==='seer'?'Veggente':target2.role==='healer'?'Guaritore':target2.role==='sheriff'?'Sceriffo':target2.role==='jester'?'Matto':'Villager'}`;
-        addNarratorSecret(`🔮 Hai investigato: <strong>${target2.name}</strong> → ruolo: <strong>${roleLabel2}</strong>`);
-      }
-    } else if (human.role === 'healer') {
-      const aliveAll = game.players.filter(p=>!p.dead);
-      const choiceStr = await waitForPlayerChoice(
-        `💚 Sei il GUARITORE — scegli chi proteggere (puoi anche scegliere te stesso)`,
-        aliveAll.map(p=>p.name)
-      );
-      protected_name = choiceStr;
-      addNarratorSecret(`💚 Hai protetto: <strong>${protected_name}</strong>`);
-    } else if (human.role === 'sheriff' && !human.hasShot) {
-      const aliveOthers = game.players.filter(p=>!p.dead&&p.name!==human.name);
-      const options = [...aliveOthers.map(p=>p.name), '— Non sparare questa notte'];
-      const choiceStr = await waitForPlayerChoice(
-        `🔫 Sei lo SCERIFFO — vuoi usare il tuo proiettile?`,
-        options
-      );
-      if (!choiceStr.startsWith('—')) {
-        human.hasShot = true;
-        const shotTarget2 = game.players.find(p=>p.name===choiceStr);
-        if (shotTarget2) {
-          shotTarget2.dead = true;
-          sheriff_killed = shotTarget2.name;
-          game.deathLog.push(`${shotTarget2.name} sparato dallo Sceriffo (notte ${game.night})`);
-          addNarratorSecret(`🔫 Hai sparato a: <strong>${shotTarget2.name}</strong> → ❌ MORTO istantaneamente.`);
-        }
-      } else {
-        addNarratorSecret(`🔫 Hai deciso di non sparare — proiettile ancora disponibile.`);
-      }
-    }
-  }
-
-  return { killed: killed_name, sheriffKilled: sheriff_killed };
-}
-
-function addHumanSecret(html) {
-  const log = document.getElementById('chat-log');
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'margin:0.3rem 0;padding:0.5rem 0.75rem;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#92400e;font-family:var(--font-mono,monospace);';
-  wrap.innerHTML = `<span style="opacity:0.6;font-size:0.65rem">👤 solo tu vedi questo · </span>${html}`;
-  log.appendChild(wrap);
-  wrap.scrollIntoView({behavior:'smooth'});
-}
-
-function revealHumanRole() {
-  if (!game?.humanPlayer) return;
-  const human = game.humanPlayer;
-  const rmap = {wolf:'🐺 LUPO MANNARO',seer:'🔮 VEGGENTE',healer:'💚 GUARITORE',sheriff:'🔫 SCERIFFO',jester:'🃏 MATTO',villager:'👤 VILLAGER'};
-  const allies = human.role==='wolf'
-    ? game.players.filter(p=>p.role==='wolf'&&!p.isHuman).map(p=>p.name)
-    : [];
-  const allyCtx = allies.length ? ` I tuoi complici lupi: <strong>${allies.join(', ')}</strong>` : '';
-  addHumanSecret(`🎭 Il tuo ruolo segreto: <strong>${rmap[human.role]}</strong>${allyCtx}`);
-}
-
-function addNarratorSecret(html) {
-  if (game?.humanPlayer && isPlayerMode()) return;
-  const log = document.getElementById('chat-log');
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'margin:0.3rem 0;padding:0.5rem 0.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#713f12;font-family:var(--font-mono,monospace);';
-  wrap.innerHTML = `<span style="opacity:0.6;font-size:0.65rem">📜 solo tu vedi questo · </span>${html}`;
-  log.appendChild(wrap);
-  wrap.scrollIntoView({behavior:'smooth'});
-}
-
-async function runDay(nightResult) {
-  const killed = typeof nightResult === 'object' ? nightResult?.killed : nightResult;
-  const sheriffKilled = typeof nightResult === 'object' ? nightResult?.sheriffKilled : null;
-
-  const alive = game.players.filter(p=>!p.dead);
-  game.phase = 'day';
-  setPhase(`Giorno ${game.night}`, 'day');
-  showDayFlash();
-  playSound('day');
-  await sleep(500);
-  addSep(`— GIORNO ${game.night} —`);
-  updateSuggestions();
-  updateNarratorTargets();
-
-  // Annunci morti della notte
-  if (sheriffKilled) {
-    const sheriffName = game.players.find(p=>p.role==='sheriff')?.name || 'Lo Sceriffo';
-    addSystemMsg(`🔫 Nella notte lo Sceriffo ha sparato: ${sheriffKilled} è stato ucciso!`);
-    addEvent(`${sheriffKilled} sparato dallo Sceriffo`, 'kill');
-  }
-  if (killed) {
-    addSystemMsg(`L'alba porta una notizia tragica: ${killed} non c'è più. Il villaggio si riunisce.`);
-    addEvent(`${killed} trovato eliminato`, 'kill');
-  }
-  if (!killed && !sheriffKilled) {
-    addSystemMsg(`Nessuno è morto stanotte. I lupi sono ancora tra noi.`);
-  }
-  await sleep(getDelay()*0.5);
-
-  // Info ruoli in gioco per il contesto strategie
-  const hasMatto = game.players.some(p=>p.role==='jester'&&!p.dead);
-  const hasSheriff = game.players.some(p=>p.role==='sheriff'&&!p.dead);
-  const rolesInGame = game.players.filter(p=>!p.dead).map(p=>p.role);
-
-  // Strategie comuni a tutti
-  const commonStrategies = `Strategie disponibili:
-- Accountability Framework: proponi che tutti giustifichino ogni voto con prove concrete
-- Graveyard Analysis: analizza le morti passate e correlale ai comportamenti diurni
-- Pattern di voto: traccia incoerenze nei voti di tutti i giorni precedenti ("hai votato X il giorno 1 e ora lo difendi, perché?")
-- Accusare i silenziosi: chi non prende mai posizione sta nascondendo qualcosa
-- Rules Lawyering: usa la logica matematica per dimostrare la tua innocenza
-- Behavioral Analysis: osserva il comportamento emotivo, non solo la logica
-- LYLO Awareness: quando i numeri sono critici cambia completamente strategia
-- Silenzio strategico: non prendere posizione, osserva come reagiscono gli altri
-- Redemption Arc: lasciati accusare, smonta l'accusa con prove, esci più credibile${hasMatto?' - Attenzione al Matto: potrebbe cercare di farsi accusare deliberatamente — non cadere nella sua trappola':''}`;
-
-  const storico = discussionHistory => discussionHistory.length > 0
-    ? `\n\nEcco cosa è stato detto finora:\n${discussionHistory.map(m=>`${m.name}: "${m.text}"`).join('\n')}`
-    : '';
-
-  // Storico dei messaggi della discussione
-  const discussionHistory = [];
-
-  // 3 giri completi di discussione con diritto di replica
-  for (let round = 1; round <= 3; round++) {
-    addSep(`— DISCUSSIONE — turno ${round}/3`);
-    const aliveCurrent = game.players.filter(p=>!p.dead);
-
-    for (let i = 0; i < aliveCurrent.length; i++) {
-      const p = aliveCurrent[i];
-      if (!isRunning) return;
-      await waitIfPaused();
-
-      // Contesto ordine solo al primo turno
-      const alreadySpoke = aliveCurrent.slice(0,i).map(x=>x.name);
-      const yetToSpeak = aliveCurrent.slice(i+1).map(x=>x.name);
-      const orderCtx = round===1
-        ? ` ${alreadySpoke.length ? `Hanno già parlato: ${alreadySpoke.join(', ')}.` : 'Sei il primo a parlare.'} ${yetToSpeak.length ? `Devono ancora parlare: ${yetToSpeak.join(', ')} — non accusarli di silenzio ancora.` : 'Sei l\'ultimo a parlare.'}`
-        : '';
-
-      const historyCtx = storico(discussionHistory);
-
-      const baseCtx = round===1
-        ? (killed||sheriffKilled
-            ? `È giorno ${game.night}. Stanotte ${[sheriffKilled,killed].filter(Boolean).join(' e ')} ${sheriffKilled&&killed?'sono stati eliminati':' è stato eliminato'}. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
-            : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
-        : round===2
-        ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti.`
-        : `Turno 3 di discussione. Continua il dibattito, rispondi a chi ti ha accusato, porta nuovi argomenti o rafforza i tuoi. Non devi ancora dichiarare il tuo voto.`;
-
-      const ctx = `${baseCtx}${orderCtx}${historyCtx}
-
-Parla direttamente in personaggio — non analizzare la situazione ad alta voce, non elencare le tue considerazioni, non fare ragionamenti espliciti sulle strategie. Vai dritto al punto con una dichiarazione in gioco.`;
-
-      // Turno umano o AI
-      let reply;
-      if (p.isHuman) {
-        const label = `💬 È il tuo turno (turno ${round}/3) — parla in gioco`;
-        reply = await waitForPlayerInput(label);
-        addMsg(p, reply, 'day');
-      } else {
-        showThinking(p);
-        setStatus(`${p.name} parla (turno ${round}/3)...`);
-        reply = await ask(p, ctx);
-        removeThinking();
-        addMsg(p, reply, 'day');
-      }
-      discussionHistory.push({name: p.name, text: reply});
-
-      // ── DIRITTO DI REPLICA ────────────────────────────
-      // Cerca se qualcuno viene accusato nel messaggio
-      const accusedPlayers = aliveCurrent.filter(accused =>
-        accused.name !== p.name &&
-        reply.toLowerCase().includes(accused.name.toLowerCase())
-      );
-
-      for (const accused of accusedPlayers) {
-        if (!isRunning) break;
-        await waitIfPaused();
-        await sleep(getDelay()*0.5);
-
-        if (accused.isHuman) {
-          // L'umano può rispondere manualmente
-          const replyMsg = await waitForPlayerInput(`💬 ${p.name} ha parlato di te — vuoi replicare?`);
-          if (replyMsg.trim()) {
-            addMsg(accused, replyMsg, 'day');
-            discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
-          }
-        } else {
-          showThinking(accused);
-          setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
-          const replyCtx = `${p.name} ha appena parlato di te nel suo intervento: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi, ma la tua risposta non dà diritto ad ulteriori repliche.${historyCtx}`;
-          const replyMsg = await ask(accused, replyCtx);
-          removeThinking();
-          addMsg(accused, replyMsg, 'day');
-          discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
-          await sleep(getDelay()*0.8);
-        }
-      }
-      // ─────────────────────────────────────────────────
-
-      await sleep(getDelay()*1.2);
-    }
-    if (round < 3) await sleep(getDelay()*0.5);
-  }
-
-  // In modalità player la partita avanza automaticamente, altrimenti aspetta il narratore
-  if (!game.humanPlayer) {
-    addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
-    setStatus('In attesa del narratore...');
-    await waitForAdvance('🗳️ Avanza al voto');
-    await waitIfPaused();
-  } else {
-    await sleep(getDelay()*0.5);
-  }
+  await waitForAdvance('🗳️ Avanza al voto');
+  await waitIfPaused();
 
   addSep('— VOTAZIONE —');
   addSystemMsg('Il villaggio vota chi bandire.');
@@ -1864,20 +1441,12 @@ Parla direttamente in personaggio — non analizzare la situazione ad alta voce,
     const candidates = aliveFinal.filter(p=>p.name!==voter.name);
 
     let choice;
-    if (voter.isHuman) {
-      const choiceStr = await waitForPlayerChoice(
-        `🗳️ Vota chi vuoi eliminare`,
-        candidates.map(p=>p.name)
-      );
-      choice = choiceStr;
-      addMsg(voter, `Voto per eliminare ${choice}.`, 'vote');
-    } else {
-      showThinking(voter);
+    showThinking(voter);
       setStatus(`${voter.name} vota...`);
       choice = await ask(voter, `È il momento del voto. Basandoti sulla discussione, dichiara in una frase chi vuoi eliminare e perché, poi indica il nome esatto.${voter.role==='wolf'?' Giustifica il tuo voto con argomenti da cittadino innocente — non rivelare mai la tua vera natura o i tuoi veri obiettivi.':voter.role==='jester'?' Ricorda il tuo obiettivo: devi farti eliminare tu, non votare strategicamente per il villaggio.':''}${voteSummary}`, candidates);
       removeThinking();
       addMsg(voter, choice, 'vote');
-    }
+
     if (votes[choice]!==undefined) votes[choice]++;
     await sleep(getDelay()*1.0);
   }
@@ -1922,8 +1491,6 @@ function stopGame() {
   document.getElementById('start-btn').disabled = false;
   document.getElementById('start-btn').textContent = 'Nuova Partita';
   document.getElementById('advance-btn').style.display = 'none';
-  document.getElementById('player-input-area')?.remove();
-
   // Rivela tutti i ruoli
   if (game) {
     const rmap = {wolf:'🐺 Lupo',seer:'🔮 Veggente',healer:'💚 Guaritore',sheriff:'🔫 Sceriffo',jester:'🃏 Matto',villager:'👤 Villager'};
@@ -2003,12 +1570,8 @@ function startGame() {
   isPaused=false;
   document.getElementById('pause-btn').textContent='⏸ Pausa';
   document.getElementById('pause-btn').classList.remove('paused');
-
-  const playerMode = document.getElementById('player-mode')?.checked;
   const n = parseInt(document.getElementById('num-players-select').value);
-  const aiCount = playerMode ? n - 1 : n;
-
-  game = {
+  const aiCount = n;game = {
     players: PLAYER_SLOTS.slice(0, aiCount).map((slot,i)=>{
       const a=getAssignment(i)||opts[i%opts.length];
       const provider=PROVIDERS.find(p=>p.id===a.providerId);
@@ -2022,32 +1585,13 @@ function startGame() {
         providerId: a.providerId,
         modelId: a.modelId,
         bg: BG_COLORS[i%BG_COLORS.length],
-        dead: false, role: null, seenPlayers: [], isHuman: false,
+        dead: false, role: null, seenPlayers: [],
       };
     }),
     night:0, phase:'setup', deathLog:[], gameOver:false, dayHistory:[],
-    humanPlayer: null,
   };
 
-  // Aggiungi il giocatore umano se in modalità player
-  if (playerMode) {
-    const humanSlot = {
-      emoji: '🧑',
-      name: 'Tu',
-      providerLabel: 'Giocatore umano',
-      providerId: null,
-      modelId: null,
-      bg: '#fef3c7',
-      dead: false, role: null, seenPlayers: [], isHuman: true,
-      personality: 'giocatore umano'
-    };
-    game.players.push(humanSlot);
-    game.humanPlayer = humanSlot;
-  }
-
-  assignRoles(game.players);
-  if (playerMode) revealHumanRole();
-  updatePlayersList(); updateStats();
+  assignRoles(game.players);updatePlayersList(); updateStats();
   updateNarratorTargets(); updateSuggestions();
   isRunning=true;
   setPhase('partita in corso');
