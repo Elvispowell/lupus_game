@@ -1305,9 +1305,9 @@ function checkCanStart() {
   const hasServerSide = PROVIDERS.some(p=>p.serverSide);
   const has = hasKey || hasServerSide;
   const btn = document.getElementById('start-btn');
-  btn.disabled = !has;
-  btn.textContent = has ? 'Inizia Partita' : 'Aggiungi almeno una key';
-  setStatus(has ? 'Premi "Inizia Partita" per cominciare' : 'Configura le API key nel pannello sopra');
+  btn.disabled = false;
+  btn.textContent = has ? 'Inizia Partita' : 'Inizia Partita (aggiungi key!)';
+  setStatus(has ? 'Premi "Inizia Partita" per cominciare' : 'Configura le API key nel pannello sopra per giocare');
   rebuildAssignGrid();
 }
 
