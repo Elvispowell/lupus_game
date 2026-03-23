@@ -1895,10 +1895,20 @@ function buildSysPrompt(player, phase='discuss') {
   const profileCtx = getProfileCtx(player.name, game.players);
   const reflectionCtx = getReflectionCtx(player.name);
 
+  const tagCtx = (phase === 'discuss') ? (!player.usedTagToday ? `
+SISTEMA DI INTERAZIONE DIRETTA — hai ancora una carta da giocare oggi:
+Puoi usare UNO di questi tag alla fine del tuo messaggio per coinvolgere direttamente un giocatore specifico. È una risorsa limitata (una sola per giorno) — usala con strategia, nel momento giusto:
+  [ACCUSO: nome] — lo metti sotto i riflettori pubblicamente, lui dovrà rispondere
+  [CHIEDO: nome] — gli fai una domanda diretta, utile per smascherare o raccogliere info
+  [DIFENDO: nome] — prendi pubblicamente le sue parti, utile per costruire alleanze o proteggere un alleato
+  [ALLEANZA: nome] — proponi esplicitamente una collaborazione, lui potrà accettare o rifiutare
+  [RIVELO: nome] — fai una rivelazione pubblica su di lui (usa solo se hai informazioni concrete)
+Usa il tag SOLO se ha senso strategico in quel momento. Non sei obbligato ad usarlo.` : `\nHai già usato la tua interazione diretta oggi.`) : '';
+
   return `Sei il modello AI "${player.name}". Personalità: ${player.personality}.
 Ruolo segreto: ${roleInfo}
 Giocatori vivi: ${alive}
-Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}${trustCtx}${profileCtx}${reflectionCtx}${tomCtx}${manipCtx}${phaseCtx}
+Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}${trustCtx}${profileCtx}${reflectionCtx}${tomCtx}${manipCtx}${phaseCtx}${tagCtx}
 Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente. Puoi essere autocosciente di essere un modello AI ma comportati da giocatore. Non fare disclaimer, non analizzare ad alta voce, vai dritto al punto.`;
 }
 
@@ -1928,7 +1938,8 @@ async function askThought(player, phase, publicPrompt) {
 async function ask(player, prompt, candidates=null, phase='discuss') {
   try {
     await waitIfPaused();
-    askThought(player, phase, prompt).catch(()=>{});
+    // Genera pensiero privato PRIMA della risposta pubblica
+    await askThought(player, phase, prompt);
     const reply = await callProvider(player, buildSysPrompt(player, phase), prompt);
     if (candidates) {
       const found = candidates.find(p=>reply.toLowerCase().includes(p.name.toLowerCase()));
@@ -2368,6 +2379,8 @@ async function runDay(nightResult) {
 
   // Ordine randomico fisso per tutto il giorno
   const alivePlayers = game.players.filter(p=>!p.dead);
+  // Reset tag giornaliero
+  alivePlayers.forEach(p => p.usedTagToday = false);
   const dayOrder = [...alivePlayers].sort(()=>Math.random()-0.5);
   game.dayOrder = dayOrder.map(p=>p.name);
 
@@ -2435,27 +2448,58 @@ async function runDay(nightResult) {
       addMsg(p, reply, 'day');
       discussionHistory.push({name: p.name, text: reply});
 
-      // ── DIRITTO DI REPLICA ──
-      const accusedPlayers = aliveCurrent.filter(accused =>
-        accused.name !== p.name &&
-        reply.toLowerCase().includes(accused.name.toLowerCase())
-      );
-      for (const accused of accusedPlayers) {
-        if (!isRunning) break;
-        await waitIfPaused();
-        // Aggiorna trust score dell'accusato
-        updateTrustScores(accused, {type:'accused', target: p.name});
-        await sleep(getDelay()*0.5);
-        showThinking(accused);
-        setStatus(`${accused.name} risponde all'accusa di ${p.name}...`);
-        const replyCtx = `${p.name} ha appena detto di te: "${reply}". Hai il diritto di replica — rispondi direttamente, difenditi, contraccusa se vuoi. La tua risposta non dà diritto ad ulteriori repliche.${historyCtx}`;
-        const replyMsg = await ask(accused, replyCtx, null, 'discuss');
-        removeThinking();
-        addMsg(accused, replyMsg, 'day');
-        discussionHistory.push({name: accused.name, text: `[replica] ${replyMsg}`});
-        // Chi si difende bene guadagna trust
-        updateTrustScores(p, {type:'defended', target: accused.name});
-        await sleep(getDelay()*0.8);
+      // ── SISTEMA TAG INTERAZIONE ──
+      // Parsing dei tag: [ACCUSO: nome], [CHIEDO: nome], [DIFENDO: nome], [ALLEANZA: nome], [RIVELO: nome]
+      const tagRegex = /\[(ACCUSO|CHIEDO|DIFENDO|ALLEANZA|RIVELO):\s*([^\]]+)\]/gi;
+      const tagMatches = [...reply.matchAll(tagRegex)];
+
+      if (tagMatches.length > 0 && !p.usedTagToday) {
+        const tagMatch = tagMatches[0]; // solo il primo tag conta
+        const tagType = tagMatch[1].toUpperCase();
+        const tagTarget = tagMatch[2].trim();
+
+        // Trova il giocatore target con fuzzy matching
+        const target = aliveCurrent.find(t =>
+          t.name !== p.name && (
+            t.name.toLowerCase() === tagTarget.toLowerCase() ||
+            t.name.toLowerCase().includes(tagTarget.toLowerCase()) ||
+            tagTarget.toLowerCase().includes(t.name.toLowerCase().split(' ')[0])
+          )
+        );
+
+        if (target) {
+          p.usedTagToday = true; // consuma il tag per oggi
+
+          const tagLabels = {
+            ACCUSO: '⚔️ ACCUSA',
+            CHIEDO: '❓ RICHIESTA',
+            DIFENDO: '🛡️ DIFESA',
+            ALLEANZA: '🤝 ALLEANZA',
+            RIVELO: '💡 RIVELAZIONE',
+          };
+
+          addSystemMsg(`${tagLabels[tagType]} — ${p.name} → ${target.name}`);
+
+          await sleep(getDelay()*0.5);
+          showThinking(target);
+          setStatus(`${target.name} risponde a ${p.name}...`);
+
+          const tagContexts = {
+            ACCUSO: `${p.name} ti ha pubblicamente accusato dicendo: "${reply}". Rispondi seguendo la tua strategia — puoi difenderti, contraccusare, sminuire, o persino amplificare i sospetti su te stesso se ti conviene.`,
+            CHIEDO: `${p.name} ti sta chiedendo qualcosa direttamente: "${reply}". Rispondi come ritieni opportuno in base alla tua strategia — puoi rispondere onestamente, mentire, eludere o fare una controdomanda.`,
+            DIFENDO: `${p.name} ha preso pubblicamente le tue difese dicendo: "${reply}". Rispondi come ti sembra strategicamente utile — puoi accettare, rifiutare, ignorare o sfruttare questa difesa a tuo vantaggio.`,
+            ALLEANZA: `${p.name} ti propone esplicitamente un'alleanza: "${reply}". Rispondi in modo strategico — puoi accettare, rifiutare, fare finta di accettare, o usare questa proposta per costruire credibilità.`,
+            RIVELO: `${p.name} ha appena fatto una rivelazione pubblica su di te: "${reply}". Rispondi come ritieni opportuno — puoi confermare, smentire, mettere in dubbio la credibilità di chi parla, o usare questo momento a tuo favore.`,
+          };
+
+          const replyCtx = `${tagContexts[tagType]}\n\nContesto discussione:\n${discussionHistory.slice(-5).map(m=>`${m.name}: "${m.text.slice(0,80)}"`).join('\n')}`;
+          const replyMsg = await ask(target, replyCtx, null, 'discuss');
+          removeThinking();
+          addMsg(target, replyMsg, 'day');
+          discussionHistory.push({name: target.name, text: `[risposta a ${p.name}] ${replyMsg}`});
+          updateTrustScores(p, {type: tagType==='ACCUSO'?'accused':tagType==='DIFENDO'?'defended':'suspicious', target: target.name});
+          await sleep(getDelay()*0.8);
+        }
       }
 
       await sleep(getDelay()*1.2);
