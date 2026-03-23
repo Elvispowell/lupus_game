@@ -2688,9 +2688,6 @@ Massimo 3 tendenze, molto specifiche e osservabili (es. "accusa il primo a parla
 // START / RESET
 // ═══════════════════════════════════════════════════════
 function startGame() {
-  const opts = getAvailableOptions();
-  if (!opts.length) return;
-
   document.getElementById('start-btn').disabled=true;
   document.getElementById('chat-log').innerHTML='';
   document.getElementById('events-log').innerHTML='';
