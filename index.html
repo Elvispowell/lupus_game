@@ -297,9 +297,9 @@
       <button id="stop-btn" onclick="stopGame()" style="display:none;font-family:'DM Sans',sans-serif;font-size:0.65rem;padding:0.25rem 0.9rem;border:1px solid #991b1b;border-radius:5px;background:#fef2f2;color:#991b1b;cursor:pointer;font-weight:500">⏹ Ferma Partita</button>
       <span class="ctrl-label">Velocità:</span>
       <select id="speed-select" class="ctrl">
-        <option value="2000">Veloce</option>
-        <option value="4000" selected>Normale</option>
-        <option value="7000">Lenta</option>
+        <option value="1000">Veloce</option>
+        <option value="2000" selected>Normale</option>
+        <option value="3500">Lenta</option>
       </select>
       <span class="ctrl-label">Giocatori:</span>
       <select id="num-players-select" class="ctrl" onchange="rebuildAssignGrid()">
@@ -1716,7 +1716,7 @@ async function callProvider(player, sys, usr) {
     if (!provider.serverSide && !keys[pid]) continue;
     const key = provider.serverSide ? '' : keys[pid].replace(/[^\x20-\x7E]/g,'').trim();
     try {
-      await sleep(2000);
+      await sleep(1000);
       const result = await provider.call(key, mid, sys, usr);
       player.lastUsedProvider = pid;
       return result;
@@ -1727,14 +1727,14 @@ async function callProvider(player, sys, usr) {
   throw new Error(`Tutti i provider falliti: ${errors.join(' | ')}`);
 }
 
-// Chiamata NVIDIA GLM-5 per analisi post-game
+// Chiamata NVIDIA Kimi K2.5 per analisi post-game
 async function callGLM5(sys, usr) {
   const nvProvider = PROVIDERS.find(p=>p.id==='nvidia');
   if (!nvProvider || !keys['nvidia']) return null;
   const key = keys['nvidia'].replace(/[^\x20-\x7E]/g,'').trim();
   try {
     await sleep(2000);
-    return await nvProvider.call(key, 'z-ai/glm5', sys, usr);
+    return await nvProvider.call(key, 'moonshotai/kimi-k2-instruct-0905', sys, usr);
   } catch(e) {
     return null;
   }
@@ -2616,7 +2616,7 @@ async function runPostGameAnalysis(winner) {
 
   for (const player of game.players) {
     if (!isRunning && !game.gameOver) break;
-    await sleep(2000);
+    await sleep(1000);
 
     const playerRole = rmap[player.role] || 'Villager';
     const survived = !player.dead ? 'sopravvissuto' : 'eliminato';
@@ -2636,7 +2636,7 @@ Log partita:\n${gameLog}`;
       reflections[player.name] = { text: reflection, date: new Date().toISOString(), role: playerRole, won };
     }
 
-    await sleep(2000);
+    await sleep(1000);
 
     // Opponent profiling
     const profilingSys = `Sei un analista comportamentale di giochi sociali. Analizza il comportamento osservabile del giocatore "${player.name}".`;
