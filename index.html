@@ -293,7 +293,7 @@
     </div>
 
     <div id="controls">
-      <button id="start-btn" onclick="startGame()" disabled>Aggiungi almeno una key</button>
+      <button id="start-btn" onclick="startGame()">Inizia Partita</button>
       <button id="stop-btn" onclick="stopGame()" style="display:none;font-family:'DM Sans',sans-serif;font-size:0.65rem;padding:0.25rem 0.9rem;border:1px solid #991b1b;border-radius:5px;background:#fef2f2;color:#991b1b;cursor:pointer;font-weight:500">⏹ Ferma Partita</button>
       <span class="ctrl-label">Velocità:</span>
       <select id="speed-select" class="ctrl">
@@ -1309,23 +1309,6 @@ function checkCanStart() {
   btn.textContent = has ? 'Inizia Partita' : 'Inizia Partita (aggiungi key!)';
   setStatus(has ? 'Premi "Inizia Partita" per cominciare' : 'Configura le API key nel pannello sopra per giocare');
   rebuildAssignGrid();
-}
-
-function getAvailableOptions() {
-  const opts = [];
-  PROVIDERS.forEach(p => {
-    if (p.serverSide || keys[p.id]) p.models.forEach(m => opts.push({ label:`${p.name} · ${m.label}`, providerId:p.id, modelId:m.id }));
-  });
-  return opts;
-}
-
-function updateChipName(i) {
-  const sel = document.getElementById(`assign-${i}`);
-  const lbl = document.getElementById(`chip-label-${i}`);
-  if (!sel || !lbl) return;
-  const opts = getAvailableOptions();
-  const opt = opts[parseInt(sel.value)];
-  lbl.textContent = opt ? opt.label.split(' · ')[1] : '—';
 }
 
 function rebuildAssignGrid() {
