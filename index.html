@@ -1472,8 +1472,7 @@ function updatePlayersList() {
         <div class="player-name">${p.name}${mayorBadge}${profileBadge}</div>
         <div class="player-meta">${p.providerLabel}</div>
         <div class="player-role-label">${roleLabel}</div>
-        ${trustInfo ? `<div style="font-size:0.5rem;color:var(--text-faint);font-family:var(--font-mono,monospace);margin-top:2px">trust: ${trustInfo}</div>` : ''}
-      </div>
+              </div>
       <span class="player-status ${stClass}">${stText}</span>`;
     list.appendChild(card);
   }
