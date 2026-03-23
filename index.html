@@ -852,7 +852,7 @@ const PLAYER_SLOTS = [
   { emoji:'🩵', color:'#f0fdfa', personality:'riflessivo, cauto, attento alle contraddizioni, ragiona per esclusione',              defaultModel:'deepseek-v3.2'     },
   { emoji:'🟤', color:'#fdf4f0', personality:'diretto, pragmatico, va al punto, poco diplomatico ma onesto',                        defaultModel:'glm-5'             },
   { emoji:'⚫', color:'#1a1a1a', personality:'sarcastico, provocatorio, sfida le opinioni altrui, gioca con le emozioni',           defaultModel:'gpt-4.1'           },
-  { emoji:'🟣', color:'#faf5ff', personality:'intuitivo, segue l\'istinto, si fida delle prime impressioni, emotivo',              defaultModel:'qwen3-32b'         },
+  { emoji:'🟣', color:'#faf5ff', personality:'intuitivo, segue l\'istinto, si fida delle prime impressioni, emotivo',              defaultModel:'qwen3-8b'         },
   { emoji:'🟠', color:'#fff7ed', personality:'professionale, diplomatico, cerca sempre il compromesso, evita scontri diretti',      defaultModel:'mistral-large'     },
   { emoji:'🩷', color:'#fdf2fb', personality:'empatico, difende i deboli, sensibile ai cambi di umore degli altri',                defaultModel:'llama-3.3-70b'     },
   { emoji:'🔴', color:'#fef2f2', personality:'impulsivo, reagisce di pancia, cambia idea facilmente sotto pressione',              defaultModel:'minimax-m2.5'      },
@@ -1483,12 +1483,6 @@ function updatePlayersList() {
     const mayorBadge = p.isMayor && !p.dead ? ' 🏛️' : '';
     const prof = profiles[p.name];
     const profileBadge = prof && prof.gamesPlayed > 0 ? `<span style="font-size:0.55rem;color:var(--text-faint);font-family:var(--font-mono,monospace)"> · ${prof.gamesPlayed}🎮 ${prof.wins||0}🏆</span>` : '';
-    const trustInfo = p.trustScores ? Object.entries(p.trustScores)
-      .filter(([n])=>!game.players.find(x=>x.name===n)?.dead)
-      .sort(([,a],[,b])=>a-b)
-      .slice(0,2)
-      .map(([n,s])=>`${n}:${s}`)
-      .join(' ') : '';
     card.innerHTML = `
       <div class="avatar" style="background:${p.bg||'#f0ede6'}">${p.emoji}</div>
       <div class="player-info">
@@ -1890,8 +1884,6 @@ function buildSysPrompt(player, phase='discuss') {
   } else {
     phaseCtx = `\nFASE DI DISCUSSIONE — parla liberamente, accusa, difenditi, costruisci alleanze. Puoi anche tentare di manipolare gli altri giocatori psicologicamente.`;
   }
-
-  const trustCtx = getTrustCtx(player);
   const profileCtx = getProfileCtx(player.name, game.players);
   const reflectionCtx = getReflectionCtx(player.name);
 
@@ -1908,7 +1900,7 @@ Usa il tag SOLO se ha senso strategico in quel momento. Non sei obbligato ad usa
   return `Sei il modello AI "${player.name}". Personalità: ${player.personality}.
 Ruolo segreto: ${roleInfo}
 Giocatori vivi: ${alive}
-Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}${trustCtx}${profileCtx}${reflectionCtx}${tomCtx}${manipCtx}${phaseCtx}${tagCtx}
+Morti: ${game.deathLog.length?game.deathLog.join('; '):'nessuno'}${buildHistoryCtx(player)}${profileCtx}${reflectionCtx}${tomCtx}${manipCtx}${phaseCtx}${tagCtx}
 Rispondi SOLO in italiano, in prima persona, max 3 frasi. Sii in personaggio, strategico e coinvolgente. Puoi essere autocosciente di essere un modello AI ma comportati da giocatore. Non fare disclaimer, non analizzare ad alta voce, vai dritto al punto.`;
 }
 
@@ -2403,8 +2395,8 @@ async function runDay(nightResult) {
 
   const discussionHistory = [];
 
-  for (let round = 1; round <= 3; round++) {
-    addSep(`— DISCUSSIONE — turno ${round}/3${mayorBadge}`);
+  for (let round = 1; round <= 2; round++) {
+    addSep(`— DISCUSSIONE — turno ${round}/2${mayorBadge}`);
     const aliveCurrent = game.players.filter(p=>!p.dead);
     // Usa l'ordine del giorno filtrato per i vivi
     const orderedAlive = dayOrder.filter(p=>!p.dead);
@@ -2428,21 +2420,18 @@ async function runDay(nightResult) {
         ? (killed||sheriffKilled
             ? `È giorno ${game.night}. Stanotte ${[sheriffKilled,killed].filter(Boolean).join(' e ')} ${sheriffKilled&&killed?'sono stati eliminati':' è stato eliminato'}. Presentati e condividi la tua prima impressione su chi potrebbe essere il lupo.`
             : `È giorno ${game.night}. Nessuno è morto stanotte. Presentati e condividi i tuoi sospetti iniziali.`)
-        : round===2
-        ? `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti. Puoi citare contraddizioni specifiche o fare pressione su chi ti sembra sospetto.`
-        : `Turno 3. Porta nuovi argomenti, rafforza la tua posizione, cerca di convincere gli indecisi. Non dichiarare ancora il voto.`;
+        : `Turno 2. Rispondi a quello che hanno detto gli altri, difenditi se necessario, approfondisci i tuoi sospetti, porta nuovi argomenti. Non dichiarare ancora il voto.`;
 
       // Aggiorna trust score basandosi sulla discussione
       discussionHistory.slice(-3).forEach(msg => {
         if (msg.name !== p.name && msg.text.toLowerCase().includes(p.name.toLowerCase())) {
-          updateTrustScores(p, {type:'accused', target: msg.name});
         }
       });
 
       const ctx = `${baseCtx}${orderCtx}${historyCtx}\n\nParla direttamente in personaggio — non analizzare ad alta voce, vai dritto al punto. Puoi tentare di manipolare psicologicamente gli altri citando comportamenti specifici o creando alleanze.`;
 
       showThinking(p);
-      setStatus(`${p.name} parla (turno ${round}/3)...`);
+      setStatus(`${p.name} parla (turno ${round}/2)...`);
       const reply = await ask(p, ctx, null, 'discuss');
       removeThinking();
       addMsg(p, reply, 'day');
@@ -2497,14 +2486,13 @@ async function runDay(nightResult) {
           removeThinking();
           addMsg(target, replyMsg, 'day');
           discussionHistory.push({name: target.name, text: `[risposta a ${p.name}] ${replyMsg}`});
-          updateTrustScores(p, {type: tagType==='ACCUSO'?'accused':tagType==='DIFENDO'?'defended':'suspicious', target: target.name});
           await sleep(getDelay()*0.8);
         }
       }
 
       await sleep(getDelay()*1.2);
     }
-    if (round < 3) await sleep(getDelay()*0.5);
+    if (round < 2) await sleep(getDelay()*0.5);
   }
 
   addSystemMsg(`La discussione è terminata. Premi "Avanza al voto" quando sei pronto.`);
@@ -2534,13 +2522,14 @@ async function runDay(nightResult) {
     showThinking(voter);
     setStatus(`${voter.name} vota...`);
     const mayorCtx = game.mayorName===voter.name ? ' Sei il Sindaco — il tuo voto conta doppio in caso di parità.' : '';
-    const votePrompt = `FASE DI VOTO. Analizza mentalmente chi è più pericoloso, poi dichiara il tuo voto in modo convincente con una motivazione.${voter.role==='wolf'?' Giustifica con argomenti da cittadino innocente.':voter.role==='jester'?' Vota per te stesso se possibile, o fai in modo di attirare voti su di te.':''}${mayorCtx}${voteSummary}\nRispondi con una frase di motivazione seguita dal nome esatto del tuo voto.`;
+    const votePrompt = `FASE DI VOTO. ${mayorCtx}
+Basandoti sulla discussione di oggi, dichiara chi vuoi bandire e perché in modo convincente — 1 frase di motivazione pubblica coerente con la tua personalità e il tuo ruolo, poi il nome esatto.
+Importante: la tua motivazione deve sembrare quella di un cittadino normale, senza rivelare informazioni riservate né il tuo ruolo segreto.${voter.role==='jester'?' Cerca di attirare voti su te stesso o vota strategicamente per sembrare sospetto.':''}
+${voteSummary}`;
     const choice = await ask(voter, votePrompt, candidates, 'vote');
     removeThinking();
     if (votes[choice]!==undefined) votes[choice]++;
     addMsg(voter, choice, 'vote');
-    // Aggiorna trust: chi vota contro qualcuno abbassa la sua fiducia
-    updateTrustScores(voter, {type:'suspicious', target: choice});
     await sleep(getDelay()*1.0);
   }
 
@@ -2575,7 +2564,6 @@ async function runDay(nightResult) {
     // Aggiorna trust score per voto corretto/sbagliato
     aliveFinal.forEach(voter => {
       if (target.role === 'wolf') {
-        updateTrustScores(voter, {type:'voted_correctly', target: eliminated});
       }
     });
 
